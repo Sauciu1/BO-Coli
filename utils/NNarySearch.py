@@ -18,7 +18,7 @@ class NNarySearch:
         self.bounds = bounds
         self.history = dict()
         self.data = None
-        self.split_power = split_power
+        self.split_power = float(split_power)
         self.iterations = 0
 
         self.split_function = self._logistic_split_data
@@ -102,11 +102,11 @@ class NNarySearch:
             )
         self.history[max(self.history.keys()) + 1] = res
 
-    def run_search(self, data, print = False):
+    def run_search(self, data, plot = False):
         data = self._preprocess_data(data)
 
         while True:
-            if print:
+            if plot:
                 sns.lineplot(data)
             regions = self.split_function(data)
             region_types = [self._check_region(region) for region in regions]
@@ -124,22 +124,34 @@ class NNarySearch:
             if "target_match" in region_types or len(target_reg) == self.n:
                 break
         
-        self.iterations = 0
+        self.iterations = max(self.history.keys())
         return data
 
 
 if __name__ == "__main__":
     from distribution_functions import logistic_tensor
     from matplotlib import pyplot as plt
-
+    import seaborn as sns
     linspace, logistic = logistic_tensor(3e5, 1e-3, 0, 1e6)
 
-    mask = (linspace > 2.9e5) & (linspace < 3.1e5)
 
-    import seaborn as sns
+if __name__ =="__main__":
 
-    nary = NNarySearch(n=3, bounds=(0.1, 0.9), split_power=0.5)
-    d = np.arange(0, 100, 1)
+
+    grid = pd.DataFrame()
+    for splits in range(2, 6):
+        for power in np.linspace(0.2, 2, 10):
+            search = NNarySearch(splits, split_power=float(power))
+            search.run_search(logistic)
+            print(search.iterations)
+
+
+
+if __name__ == "__main__a":
+
+
+
+    nary = NNarySearch(n=3, bounds=(0.1, 0.9), split_power=0.2)
     res = nary.run_search(logistic, True)
 
     sns.lineplot(res)
