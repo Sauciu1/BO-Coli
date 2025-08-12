@@ -1,8 +1,7 @@
-import pandas as pd
+import torch
 from IPython.display import display
-from typing import Literal
-import seaborn as sns
-import numpy as np
+from typing import Literal, List, Tuple
+import pandas as pd
 
 
 class NNarySearch:
@@ -12,149 +11,217 @@ class NNarySearch:
     """
 
     def __init__(
-        self, n: int = 2, bounds: float = (0.1, 0.90), split_power: float = 1
-    ) -> float:
+        self, n: int = 2, bounds: Tuple[float, float] = (0.1, 0.90), split_power: float = 1
+    ) -> None:
         self.n = n
         self.bounds = bounds
         self.history = dict()
         self.data = None
         self.split_power = float(split_power)
         self.iterations = 0
-
-        self.split_function = self._logistic_split_data
+        self.indices = None
 
     def _preprocess_data(self, data):
         """Indexes and normalizes data"""
-        if not isinstance(data, pd.Series):
-            data = pd.Series(data)
+        if isinstance(data, pd.Series):
+            self.indices = data.index
+            data = torch.tensor(data.values, dtype=torch.float32)
+        elif not isinstance(data, torch.Tensor):
+            data = torch.tensor(data, dtype=torch.float32)
+            self.indices = torch.arange(len(data))
+        else:
+            self.indices = torch.arange(len(data))
 
-        self.history[0] = ["initial", data.index[0], data.index[-1]]
-        self.data = (data - data.min()) / (data.max() - data.min())
+        self.history[0] = ["initial", self.indices[0].item(), self.indices[-1].item()]
+
+        min_val = data.min()
+        max_val = data.max()
+        self.data = (data - min_val) / (max_val - min_val)
         return self.data
 
-    def _logistic_split_data(self, data):
-        reg_sizes = self.split_power**np.arange(self.n)
-        reg_sizes = reg_sizes/reg_sizes.min()
-        reg_sizes = reg_sizes*(len(data)//sum(reg_sizes))
-        remainder = len(data)% sum(reg_sizes)
+    def _split_bounds(self, data, start=0, end=None) -> List[Tuple[int, int]]:
+        """Splits data by returning start/end bounds as tuples, according to the function init parameters."""
+        if end is None:
+            end = len(data)
+            
+        # Safety check to ensure valid bounds
+        if start >= end:
+            return [(start, min(start+1, len(data)))]
+        
+        # Calculate how to split the range
+        range_size = end - start
+        
+        # Create power-based region sizes
+        reg_sizes = torch.tensor([self.split_power**i for i in range(self.n)], dtype=torch.float32)
+        
+        # Normalize region sizes to fit within range
+        total_units = reg_sizes.sum().item()
+        unit_size = range_size / total_units
+        reg_sizes = reg_sizes * unit_size
+        
+        # Convert to integers while preserving total size
+        int_sizes = reg_sizes.floor().to(torch.int64)
+        remaining = range_size - int_sizes.sum().item()
+        
+        # Distribute remaining elements to maintain total size
+        if remaining > 0:
+            fracs = reg_sizes - int_sizes.float()
+            _, indices = torch.sort(fracs, descending=True)
+            for i in range(min(remaining, len(indices))):
+                int_sizes[indices[i]] += 1
+        
+        # Create bounds
+        bounds = []
+        curr = start
+        for size in int_sizes:
+            size_val = size.item()
+            if size_val <= 0:  # Ensure minimum region size
+                size_val = 1
+                
+            next_pos = curr + size_val
+            if next_pos > end:  # Ensure we don't exceed the end boundary
+                next_pos = end
+                
+            bounds.append((curr, next_pos))
+            curr = next_pos
+            
+            if curr >= end:  # Stop if we've reached the end
+                break
+        
+        return bounds
 
-        reg_sizes[-1]=reg_sizes[-1]+remainder 
 
-        start = 0
-        splits = list()
-        for size in reg_sizes.astype(int):
-
-            splits.append(data[start : start + size])
-            start += size
-        return splits
-
-    def _linear_split_data(self, data):
-        """
-        Split a NumPy array into exactly `self.n` contiguous parts, preserving the original index.
-        """
-
-        sizes = [
-            (int(len(data) / self.n)) + (1 if i < len(data) % self.n else 0)
-            for i in range(self.n)
-        ]
-        start = 0
-        splits = list()
-        for size in sizes:
-            splits.append(data[start : start + size])
-            start += size
-        return splits
-
-    def _check_region(self, data):
+    def _check_region_type(
+        self, start, end
+    ) -> Literal[
+        "target_match", "inflection", "stable_low", "stable_high", "boundary"
+    ]:
         """Evaluates region type"""
-        min_bound, max_bound = data.min(), data.max()
+        region_data = self.data[start:end]
+        min_bound, max_bound = region_data.min(), region_data.max()
 
         if min_bound > self.bounds[0] and max_bound < self.bounds[1]:
             return "target_match"
         elif min_bound < self.bounds[0] and max_bound > self.bounds[1]:
             return "inflection"
-
         elif max_bound < self.bounds[0]:
             return "stable_low"
         elif min_bound > self.bounds[1]:
             return "stable_high"
-
         return "boundary"
 
-    def display_history(self):
+    def display_history(self) -> None:
         """Shows history of actions in ipython notebook"""
         for key, val in self.history.items():
             print("Iteration:", key)
             df = pd.DataFrame(val).T
             display(df)
 
-    def _add_history(self, regions: list[pd.Series], reg_types: list[str]):
+    def _add_history(self, regions: List[Tuple[int, int]], reg_types: List[str]) -> None:
         """Extends region analysis history with current split"""
         res = []
-        for reg, typ in zip(regions, reg_types):
+        for (start, end), typ in zip(regions, reg_types):
+            region_data = self.data[start:end]
             res.append(
                 {
                     "region": typ,
-                    "start": reg.index[0],
-                    "end": reg.index[-1],
-                    "min": reg.min(),
-                    "max": reg.max(),
+                    "start": start,
+                    "end": end - 1,
+                    "min": region_data.min().item(),
+                    "max": region_data.max().item(),
                 }
             )
         self.history[max(self.history.keys()) + 1] = res
 
-    def run_search(self, data, plot = False):
+    def run_search(self, data, plot=False) -> torch.Tensor:
+        """Runs the n-nary search on the provided data."""
         data = self._preprocess_data(data)
+        start, end = 0, len(data)
 
         while True:
-            if plot:
-                sns.lineplot(data)
-            regions = self.split_function(data)
-            region_types = [self._check_region(region) for region in regions]
+            # Safety check
+            if end - start <= 1:
+                break
+            
+            regions = self._split_bounds(data, start, end)
+            
+            # Use the region bounds from the split, not the original start/end
+            region_types = [self._check_region_type(s, e) for s, e in regions]
 
+   
             self._add_history(regions, region_types)
 
-            target_reg = [
-                regions[i]
-                for i, reg in enumerate(region_types)
-                if reg in ["boundary", "inflection"]
+
+            target_bounds = [
+                region
+                for region, typ in zip(regions, region_types)
+                if typ in ["boundary", "inflection"]
             ]
-            data = pd.concat(target_reg)
-
-
-            if "target_match" in region_types or len(target_reg) == self.n:
+            
+            if not target_bounds:
                 break
-        
+                
+            new_start = target_bounds[0][0]
+            new_end = target_bounds[-1][1]
+            
+            # Make sure we're making progress and have valid bounds
+            if new_end <= new_start or (new_start == start and new_end == end):
+                break
+                
+            start, end = new_start, new_end
+            
+            if "target_match" in region_types or len(target_bounds) == self.n:
+                break
+
         self.iterations = max(self.history.keys())
-        return data
+        return self.data[start:end]  # Return the relevant slice
+
+
+
+
+def run_simulations(center_space, power_space, split_space, search_class):
+    from . import distribution_functions
+    results = []
+    for log_center in center_space:
+        linspace, logistic = distribution_functions.logistic_tensor(float(log_center), 1e-3, 0, 1e6)
+        for splits in split_space:
+            for power in power_space:
+                #print(f"Running search with log_center={log_center}, splits={splits}, power={power}")
+                search = search_class(splits, split_power=power)
+
+                search.run_search(logistic)
+
+
+                results.append({
+                    "log_center": log_center,
+                    "splits": splits,
+                    "power": power,
+                    "value": search.iterations,
+                })
+    return pd.DataFrame(results)
+
 
 
 if __name__ == "__main__":
+
     from distribution_functions import logistic_tensor
-    from matplotlib import pyplot as plt
-    import seaborn as sns
-    linspace, logistic = logistic_tensor(3e5, 1e-3, 0, 1e6)
+    import numpy as np
 
 
-if __name__ =="__main__":
-
-
-    grid = pd.DataFrame()
-    for splits in range(2, 6):
-        for power in np.linspace(0.2, 2, 10):
-            search = NNarySearch(splits, split_power=float(power))
-            search.run_search(logistic)
-            print(search.iterations)
+if __name__ == "__main__":
+    print(f"Running search with log_center=100.0, splits=6, power=0.3")
+    linspace, logistic = logistic_tensor(100.0, 1e-3, 0, 1e6)
+    search = NNarySearch(n=6, split_power=0.3)
+    search.run_search(logistic)
 
 
 
-if __name__ == "__main__a":
+if __name__ == "__main__":
+    center_space = np.linspace(1e2, 2e5, 100)
+    power_space = np.linspace(0.3, 2, 6)
+    split_space = np.arange(2, 8)
+    
 
 
 
-    nary = NNarySearch(n=3, bounds=(0.1, 0.9), split_power=0.2)
-    res = nary.run_search(logistic, True)
-
-    sns.lineplot(res)
-
-    plt.show()
-
+    pivot = run_simulations(center_space, power_space, split_space, NNarySearch)
