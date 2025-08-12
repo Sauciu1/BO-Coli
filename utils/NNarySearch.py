@@ -174,7 +174,7 @@ class NNarySearch:
                 break
 
         self.iterations = max(self.history.keys())
-        return self.data[start:end]  # Return the relevant slice
+        return self.data[start:end], start, end
 
 
 
