@@ -4,5 +4,6 @@ from . import (
     distribution_functions,
     NNarySearch,
     torch_nnary,
-    binary_notebook_helpers
+    binary_notebook_helpers,
+    gausian_helper,
 )
