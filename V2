@@ -1,0 +1,84 @@
+#Setup script
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.optimize import fsolve
+
+#Define params
+params = {
+    #E1
+    "E1_max": 0.5, "K_d1": 20.0, "n1": 2.0, "K_r": 100.0, "m": 2.0,            
+    "k_cat1": 36000.0, "K_m1": 50.0,
+
+    #E2
+    "E2_max": 0.4, "K_d2": 50.0, "n2": 2.0,
+    "k_cat2": 54000.0, "K_m2": 70.0, 
+    
+    #Metabolites
+    "S1_conc": 100.0, "gamma_s": 0.1      
+}
+
+#Calculate flux
+def get_S3_flux(I1, I2, p):
+    #E2 conc can be directly calculated
+    E2_conc = p["E2_max"] * (I2**p["n2"]) / (p["K_d2"]**p["n2"] + I2**p["n2"])
+
+    #Steady state equations for E1, S2 and S3
+    def equations(x):
+        E1, S2, S3 = max(x[0], 0), max(x[1], 0), max(x[2], 0)
+        
+        #E1 conc
+        expr_E1 = p["E1_max"] * (I1**p["n1"] / (p["K_d1"]**p["n1"] + I1**p["n1"])) * \
+                  (p["K_r"]**p["m"] / (p["K_r"]**p["m"] + S3**p["m"]))
+        eq1 = E1 - expr_E1
+        
+        #Enzymatic rates
+        v1 = p["k_cat1"] * E1 * p["S1_conc"] / (p["K_m1"] + p["S1_conc"])
+        v2 = p["k_cat2"] * E2_conc * S2 / (p["K_m2"] + S2)
+        
+        #Flux balance
+        eq2 = v1 - v2
+        eq3 = v2 - (p["gamma_s"] * S3)
+        
+        return [eq1, eq2, eq3]
+
+    #Find roots of 3 equations
+    initial_guess = [p["E1_max"]/2, p["K_m2"], p["K_r"]]
+    steady_state_vars, _, success, _ = fsolve(equations, initial_guess, full_output=True)
+    
+    #Identify S3 production flux
+    if success:
+        E1_ss, S2_ss, S3_ss = steady_state_vars
+        flux = p["gamma_s"] * max(S3_ss, 0)
+        return flux
+    else:
+        return 0.0
+
+#2D inducer concentration sweep
+n_points = 100
+I1_range = np.logspace(-1, 3, n_points)
+I2_range = np.logspace(-1, 3, n_points)
+S3_flux_grid = np.zeros((len(I2_range), len(I1_range)))
+
+for i, i1_conc in enumerate(I1_range):
+    for j, i2_conc in enumerate(I2_range):
+        S3_flux_grid[j, i] = get_S3_flux(i1_conc, i2_conc, params)
+print("Sweep complete.")
+
+#Plot heatmap
+plt.style.use('seaborn-v0_8-whitegrid')
+fig, ax = plt.subplots(figsize=(10, 8))
+
+heatmap = ax.imshow(S3_flux_grid, cmap="viridis", origin='lower',
+                    extent=[np.log10(I1_range[0]), np.log10(I1_range[-1]),
+                            np.log10(I2_range[0]), np.log10(I2_range[-1])],
+                    aspect='auto')
+
+ax.set_title("Steady-State S3 Production Flux", fontsize=16)
+ax.set_xlabel("Log Inducer 1 Concentration", fontsize=12)
+ax.set_ylabel("Log Inducer 2 Concentration", fontsize=12)
+
+cbar = fig.colorbar(heatmap, ax=ax)
+cbar.set_label("S3 Production Flux", fontsize=12)
+
+plt.show()
