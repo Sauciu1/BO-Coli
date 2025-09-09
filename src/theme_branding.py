@@ -17,7 +17,7 @@ def load_fonts(font_dir: str) -> None:
     return fonts
 
 
-fonts = load_fonts("utils/fonts/brisbane-font-family")
+fonts = load_fonts("src/fonts/brisbane-font-family")
 
 # Get the actual font family name from one of the files
 

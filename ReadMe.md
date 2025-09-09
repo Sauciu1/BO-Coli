@@ -1,6 +1,6 @@
 
 # Setup
-To run the project, assuming you have python installed:
+To run the project, assuming you have python 3.13 installed:
 
 ### General
 ```

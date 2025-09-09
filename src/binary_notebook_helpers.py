@@ -1,5 +1,7 @@
-from . import NNarySearch, distribution_functions
+from .NNarySearch import NNarySearch
+from . import distribution_functions
 import pandas as pd
+
 def run_simulations(center_space, power_space, split_space) -> pd.DataFrame:
     """Run simulations for different parameter combinations."""
     results = []

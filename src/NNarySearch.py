@@ -2,6 +2,7 @@ import torch
 from IPython.display import display
 from typing import Literal, List, Tuple
 import pandas as pd
+import src.distribution_functions
 
 
 class NNarySearch:
@@ -175,53 +176,3 @@ class NNarySearch:
 
         self.iterations = max(self.history.keys())
         return self.data[start:end], start, end
-
-
-
-
-def run_simulations(center_space, power_space, split_space, search_class):
-    from . import distribution_functions
-    results = []
-    for log_center in center_space:
-        linspace, logistic = distribution_functions.logistic_tensor(float(log_center), 1e-3, 0, 1e6)
-        for splits in split_space:
-            for power in power_space:
-                #print(f"Running search with log_center={log_center}, splits={splits}, power={power}")
-                search = search_class(splits, split_power=power)
-
-                search.run_search(logistic)
-
-
-                results.append({
-                    "log_center": log_center,
-                    "splits": splits,
-                    "power": power,
-                    "value": search.iterations,
-                })
-    return pd.DataFrame(results)
-
-
-
-if __name__ == "__main__":
-
-    from distribution_functions import logistic_tensor
-    import numpy as np
-
-
-if __name__ == "__main__":
-    print(f"Running search with log_center=100.0, splits=6, power=0.3")
-    linspace, logistic = logistic_tensor(100.0, 1e-3, 0, 1e6)
-    search = NNarySearch(n=6, split_power=0.3)
-    search.run_search(logistic)
-
-
-
-if __name__ == "__main__":
-    center_space = np.linspace(1e2, 2e5, 100)
-    power_space = np.linspace(0.3, 2, 6)
-    split_space = np.arange(2, 8)
-    
-
-
-
-    pivot = run_simulations(center_space, power_space, split_space, NNarySearch)

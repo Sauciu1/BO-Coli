@@ -15,8 +15,10 @@ dependencies = [
     "seaborn (>=0.13.2,<0.14.0)",
     "botorch (>=0.15.1,<0.16.0)",
     "fonttools (>=4.59.1,<5.0.0)",
-    "scikit-learn (>=1.7.1,<2.0.0)"
+    "scikit-learn (>=1.7.1,<2.0.0)",
+    "pytest (>=8.4.2,<9.0.0)"
 ]
+packages = [{include = "*", from="src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.13,<3.14"

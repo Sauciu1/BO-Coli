@@ -1,10 +1,10 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.gaussian_process import GaussianProcessRegressor
-import utils.theme_branding
+import src.theme_branding
 
 
-colors = utils.theme_branding.BRAND_COLOURS
+colors = src.theme_branding.BRAND_COLOURS
 
 
 def plot_gaussian_process_no_noise(gp:GaussianProcessRegressor, X:np.array, y:np.array, X_train:np.array, y_train:np.array):
