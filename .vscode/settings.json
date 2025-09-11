@@ -1,10 +1,27 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:poetry",
-    "python-envs.defaultPackageManager": "ms-python.python:poetry",
-    "python-envs.pythonProjects": [],
-    "python.testing.pytestArgs": [
-        "tests"
-    ],
-    "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "python.venvPath": "~/.cache/pypoetry/virtualenvs",
+  "python.analysis.extraPaths": ["./src"],
+
+  // --- Make Code Runner use Poetry ---
+  "code-runner.executorMap": {
+    "python": "poetry run python -u"
+  },
+  "code-runner.executorMapByFileExtension": {
+    ".py": "poetry run python -u"
+  },
+  "code-runner.runInTerminal": true,
+  "code-runner.fileDirectoryAsCwd": true,
+  "code-runner.cwd": "${workspaceFolder}",
+  "code-runner.clearPreviousOutput": true,
+
+  // --- Poetry integration ---
+  "python-envs.defaultEnvManager": "ms-python.python:poetry",
+  "python-envs.defaultPackageManager": "ms-python.python:poetry",
+  "python-envs.pythonProjects": [],
+
+  // --- Testing ---
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }
