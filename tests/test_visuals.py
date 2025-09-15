@@ -1,4 +1,4 @@
-from src.BO_visuals import show_point
+from BO_visuals import GPVisualiser
 from src.generate_surfaces import ResponseFunction
 import torch
 
@@ -12,7 +12,7 @@ class Test_show_point__grid_dims():
             'x1': [1, 2, 3],
             'response': [4, 5, 6]
         })
-        assert show_point.grid_dims(results_df) == (1, 1)
+        assert GPVisualiser.grid_dims(results_df) == (1, 1)
 
     def test_linear(self):
         results_df = pd.DataFrame({
@@ -20,7 +20,7 @@ class Test_show_point__grid_dims():
             'x2': [4, 5, 6],
             'response': [7, 8, 9]
         })
-        assert show_point.grid_dims(results_df) == (2, 1)
+        assert GPVisualiser.grid_dims(results_df) == (2, 1)
 
     def test_square(self):
         results_df = pd.DataFrame({
@@ -30,7 +30,7 @@ class Test_show_point__grid_dims():
             'x4': [10, 11, 12],
             'response': [13, 14, 15]
         })
-        assert show_point.grid_dims(results_df) == (2, 2)
+        assert GPVisualiser.grid_dims(results_df) == (2, 2)
     
     def test_rectangle(self):
         results_df = pd.DataFrame({
@@ -39,7 +39,7 @@ class Test_show_point__grid_dims():
             'x3': [7, 8, 9],
             'response': [10, 11, 12]
         })
-        assert show_point.grid_dims(results_df) == (2, 2)
+        assert GPVisualiser.grid_dims(results_df) == (2, 2)
 
     def test_no_response_col(self):
         results_df = pd.DataFrame({
@@ -48,7 +48,7 @@ class Test_show_point__grid_dims():
             'x3': [7, 8, 9],
             'x4': [10, 11, 12],
         })
-        assert show_point.grid_dims(results_df, response_col=False) == (2, 2)
+        assert GPVisualiser.grid_dims(results_df, response_col=False) == (2, 2)
 
 
 
@@ -82,7 +82,7 @@ class Test_get_trial_data():
         
 
     def test_get_trial_data(self):
-        df = show_point.get_trial_data(self.client)
+        df = GPVisualiser.get_obs_from_client(self.client)
         assert df.shape == (2, 3)
         assert set(df.columns) == {"x1", "x2", "response"}
         assert df["response"].tolist() == [3.0, 6.0]
@@ -90,13 +90,13 @@ class Test_get_trial_data():
     def test_longer_experiment(self):
         self.client.attach_trial({"x1": 7.0, "x2": 8.0})
         self.client.complete_trial(2, raw_data={"response": (9.0, 0.1)})
-        df = show_point.get_trial_data(self.client)
+        df = GPVisualiser.get_obs_from_client(self.client)
         assert df.shape == (3, 3)
         assert set(df.columns) == {"x1", "x2", "response"}
         assert df["response"].tolist() == [3.0, 6.0, 9.0]
 
     def test_full_df(self):
-        df = show_point.get_trial_data(self.client)
+        df = GPVisualiser.get_obs_from_client(self.client)
         expected_df = pd.DataFrame({
             "x1": [1.0, 4.0],
             "x2": [2.0, 5.0],
@@ -109,15 +109,15 @@ class Test_get_trial_data():
 class Test_get_train_Xy():
     def setup_method(self):
         configure_ax_client_2d(self)
-        self.df = show_point.get_trial_data(self.client)
+        self.df = GPVisualiser.get_obs_from_client(self.client)
     
     def test_shapes(self):
-        X, y = show_point.get_train_Xy(self.df)
+        X, y = GPVisualiser.get_train_Xy(self.df)
         assert X.shape == (2, 2)
         assert y.shape == (2, 1)
 
     def test_values(self):
-        X, y = show_point.get_train_Xy(self.df)
+        X, y = GPVisualiser.get_train_Xy(self.df)
         expected_X = torch.tensor([[1.0, 2.0], [4.0, 5.0]], dtype=torch.float32)
         expected_y = torch.tensor([[3.0], [6.0]], dtype=torch.float32)
         assert torch.allclose(X, expected_X)
@@ -125,13 +125,13 @@ class Test_get_train_Xy():
 
     def test_different_response_col(self):
         self.df.rename(columns={"response": "obj"}, inplace=True)
-        X, y = show_point.get_train_Xy(self.df, response_col="obj")
+        X, y = GPVisualiser.get_train_Xy(self.df, response_col="obj")
         expected_y = torch.tensor([[3.0], [6.0]], dtype=torch.float32)
         assert torch.allclose(y, expected_y)
     
     def test_no_response_col(self):
         try:
-            X, y = show_point.get_train_Xy(self.df, response_col="nonexistent")
+            X, y = GPVisualiser.get_train_Xy(self.df, response_col="nonexistent")
         except Exception as e:
             assert isinstance(e, KeyError)
 
