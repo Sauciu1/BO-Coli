@@ -97,7 +97,7 @@ if __name__ == "__main__":
               torch.linspace(0, 20, 100), torch.linspace(0, 20, 100), torch.linspace(0, 20, 100)]
     test_func = ResponseFunction(six_curve_sum, n_dim=6)
 
-    t = torch.tensor([[1, 2, 3, 4, 5, 6], [6, 5, 4, 3, 2, 1]], dtype=torch.float32)
+    t = torch.tensor([1, 2, 3, 4, 5, 6], dtype=torch.float32)
     print(t)
     print(t.shape)
 
