@@ -1,1 +1,1 @@
-from . import (GPVisualiser)
+from . import GPVisualiser
