@@ -2,8 +2,8 @@
 from venv import create
 import torch
 from torch import Tensor
-
-
+import pandas as pd
+import numpy as np
 
 
 def sinc(x: Tensor) -> Tensor:
@@ -65,8 +65,14 @@ class ResponseFunction:
 
     def evaluate(self, coord: Tensor) -> Tensor:
         """Evaluates the surface at given coordinates."""
-        if not isinstance(coord, Tensor):
-            coord = torch.tensor(coord, dtype=torch.float32)
+
+            
+        if isinstance(coord, pd.Series):
+            coord = torch.tensor(coord.iloc[:].astype(float).values, dtype=torch.float64)
+        elif isinstance(coord, np.ndarray):
+            coord = torch.tensor(coord, dtype=torch.float64)
+        elif not isinstance(coord, Tensor):
+            coord = torch.tensor(coord, dtype=torch.float64)
 
         if coord.shape[0] != self.n_dim:
             raise ValueError(f"Coordinate first dimension {coord.shape[0]} does not match expected {self.n_dim}")

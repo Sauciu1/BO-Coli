@@ -1,8 +1,11 @@
 from . import (
+    ax_helper,
     NNarySearch,
     theme_branding,
     distribution_functions,
     binary_notebook_helpers,
     gausian_helper,
-    generate_surfaces,
+    GPVisualiser,
+    toy_functions,
+    
 )

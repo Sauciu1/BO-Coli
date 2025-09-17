@@ -4,6 +4,18 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 from fontTools.ttLib import TTFont
 
+axes_colour = "#000000"
+BRAND_COLOURS = [
+        "#FF417B",
+        "#00C8FF",
+        "#8AFF7B",
+        "#FF8B00",
+        "#FFF75C",
+        "#D6FF36",
+    ]
+
+
+
 
 # Add all TTF/OTF fonts from the directory
 def load_fonts(font_dir: str) -> None:
@@ -17,16 +29,7 @@ def load_fonts(font_dir: str) -> None:
     return fonts
 
 
-fonts = load_fonts("src/fonts/brisbane-font-family")
 
-# Get the actual font family name from one of the files
-
-font_name = None
-if fonts:
-    ttfont = TTFont(fonts[0])
-    name_record = ttfont["name"].getName(1, 3, 1)  # Font Family name
-    font_name = name_record.toStr()
-    print(f"Using font family: {font_name}")
 
 
 def set_figure_style(axes_colour: str, prop_cycle: list[str]):
@@ -55,19 +58,16 @@ def set_figure_style(axes_colour: str, prop_cycle: list[str]):
 
 
 
-axes_colour = "#000000"
-BRAND_COLOURS = [
-    "#FF417B",
-    "#00C8FF",
-    "#8AFF7B",
-    "#FF8B00",
-    "#FFF75C",
-    "#D6FF36",
-]
-set_figure_style(axes_colour, BRAND_COLOURS)
-
 
 def set_font_to_Brisbane() -> None:
+    
+    font_name = None
+    fonts = load_fonts("src/fonts/brisbane-font-family")
+    if fonts:
+        ttfont = TTFont(fonts[0])
+        name_record = ttfont["name"].getName(1, 3, 1)  # Font Family name
+        font_name = name_record.toStr()
+        print(f"Using font family: {font_name}")
     # Use the detected font family name
     plt.rcParams.update(
         {
@@ -83,7 +83,6 @@ def set_font_to_Brisbane() -> None:
             "axes.labelweight": "bold",
         }
     )
-set_font_to_Brisbane()
 
 if __name__ == "__main__":
     plt.figure()
@@ -92,3 +91,11 @@ if __name__ == "__main__":
     plt.xlabel("X-axis Label")
     plt.ylabel("Y-axis Label")
     plt.show()
+
+
+if __name__ == "__main__":
+
+
+    set_figure_style(axes_colour, BRAND_COLOURS)
+
+    set_font_to_Brisbane()

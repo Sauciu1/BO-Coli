@@ -1,6 +1,6 @@
 from ipykernel.pickleutil import istype
 from pandas.tests.reshape.test_melt import value_name
-from src.generate_surfaces import ResponseFunction
+from toy_functions import ResponseFunction
 import pytest
 import torch
 

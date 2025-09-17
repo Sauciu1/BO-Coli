@@ -1,5 +1,5 @@
-from BO_visuals import GPVisualiser
-from src.generate_surfaces import ResponseFunction
+from . import GPVisualiser
+from toy_functions import ResponseFunction
 import torch
 
 from ax import Client, RangeParameterConfig
