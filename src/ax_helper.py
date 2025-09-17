@@ -1,67 +1,166 @@
 from ax import Client
 
-from typing import Literal
+from typing import Literal, Optional, Sequence, Tuple, Any
+import ax
 from ax.core import trial
 import pandas as pd
 from torch import Tensor
 import torch
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from ax import RangeParameterConfig
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float64
 
 
-def safe_get(df, key, index, axis=0, default=torch.nan):
+def safe_get(df: pd.DataFrame, key: str, index: int, axis: int = 0, default: Any = torch.nan) -> Any:
+    """Safely get a value from `df.loc[index, key]`.
+
+    Returns `default` when the key/index is missing.
+    """
     try:
         return df.loc[index, key]
     except KeyError:
         return default
 
 
-def get_guess_coords(client:Client, output_format: Literal["df", "tensor"]="df") -> Tensor:
-    """Get the coordinates of all the guesses made so far in the optimization."""
+def get_guess_coords(client: Client, output_format: Literal["df", "tensor"] = "df") -> Any:
+    """Return guesses (arm parameters) from an Ax `client`.
+
+    Parameters
+    - client: Ax Client instance containing an experiment with trials.
+    - output_format: 'df' to return a pandas.DataFrame, 'tensor' to return a
+      torch.Tensor (dtype/device set by module-level variables).
+
+    Returns
+    - DataFrame or Tensor containing trial arm parameter values. The DataFrame
+      uses trial index as the row index and includes a 'trial_name' column.
+    """
     full_df = pd.DataFrame()
     for index, trial in client._experiment.trials.items():
-
-        df = pd.DataFrame({'trial_name': trial.arm.name,**trial.arm.parameters}, index=[index])
-
+        df = pd.DataFrame({"trial_name": trial.arm.name, **trial.arm.parameters}, index=[index])
         full_df = pd.concat([full_df, df], ignore_index=True)
     if output_format.lower() == "df":
         return full_df
     elif output_format.lower() == "tensor":
-        
-        return torch.as_tensor(
-            full_df[[dim for dim in full_df.columns if dim != "name"]].values,
-            dtype=dtype,
-            device=device,
-        )
+        # exclude string-like columns (e.g., trial_name) when building tensor
+        numeric_cols = [c for c in full_df.columns if c != "trial_name"]
+        return torch.as_tensor(full_df[numeric_cols].values, dtype=dtype, device=device)
     
 
 
-def get_obs_from_client(client: Client, response_col:str) -> pd.DataFrame:
-    """Get trial data from an Ax client as a pandas DataFrame.
-    Variable names as columns and response as 'response' column, return missing response as NaN.
+def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
+    """Fetch existing trial parameter values and attach observed responses.
+
+    The returned DataFrame contains the trial parameters (one row per trial)
+    and a column named `response_col` containing the observed mean (or NaN
+    if not available).
     """
     obs = get_guess_coords(client, output_format="df")
     results = client._experiment.fetch_data().df
-    obs[response_col] = obs.index.map(lambda index: safe_get(results, 'mean', index))
-
-
-
+    obs[response_col] = obs.index.map(lambda index: safe_get(results, "mean", index))
     return obs
 
 
-def get_train_Xy(
-    trial_df: pd.DataFrame, dim_cols:list[str], response_col="response"
-) -> tuple[Tensor, Tensor]:
-    """Get training data from trial DataFrame."""
+def get_train_Xy(trial_df: pd.DataFrame, dim_cols: Sequence[str], response_col: str = "response") -> Tuple[Tensor, Tensor]:
+    """Extract training tensors X and y from an observation DataFrame.
 
-
-
+    Returns
+    - train_X: shape (n_dims, n_points) tensor of inputs (dtype/device from module)
+    - train_Y: shape (n_points, 1) tensor of outputs
+    """
     if response_col not in trial_df.columns:
         raise KeyError(f"Response column '{response_col}' not found in DataFrame.")
     trial_df = trial_df.dropna(subset=[response_col])
- 
-
-    train_X = torch.tensor(trial_df[dim_cols].values, dtype=dtype, device=device).T
-    train_Y = torch.tensor(trial_df[response_col].values, dtype=dtype, device=device).unsqueeze(-1)
+    X_vals = trial_df[list(dim_cols)].values
+    y_vals = trial_df[response_col].values
+    # Use shape (n_points, n_dims) which is the common convention for models
+    train_X = torch.as_tensor(X_vals, dtype=dtype, device=device)
+    train_Y = torch.as_tensor(y_vals, dtype=dtype, device=device).unsqueeze(-1)
     return train_X, train_Y
+
+class UnitCubeScaler(BaseEstimator, TransformerMixin):
+    """Scale parameters to/from the unit hypercube.
+
+    Accepts an optional iterable of Ax `RangeParameterConfig`-like objects
+    at construction. If provided, their `.bounds` are used during `fit` and
+    `transform`.
+    """
+    def __init__(self, ax_parameters: Optional[Sequence[RangeParameterConfig]] = None) -> None:
+        # store provided parameters for later use in fit
+        self.parameters = ax_parameters
+        self.bounds: Optional[np.ndarray] = self._get_bounds(ax_parameters) if ax_parameters is not None else None
+        self._output_type = "default"
+        self.dim_names: Optional[Sequence[str]] = None
+
+    def _get_bounds(self, parameters):
+        if parameters is not None:
+            return np.array([p.bounds for p in parameters])
+        return None
+
+    def set_output(self, transform=None):
+        # Accepts 'pandas' or 'default' (numpy)
+        if transform == 'pandas':
+            self._output_type = 'pandas'
+        else:
+            self._output_type = 'default'
+        return self
+
+    def fit(self, X, y=None):
+        # y is unused, but kept for compatibility with sklearn
+        if isinstance(X, pd.DataFrame):
+            self.dim_names = list(X.columns)
+        else:
+            self.dim_names = None
+        # If parameters were provided at construction, prefer those bounds
+        if getattr(self, "parameters", None) is not None:
+            # parameters may be an iterable of RangeParameterConfig or similar
+            try:
+                self.bounds = np.array([p.bounds for p in self.parameters])
+                # also set dim_names from parameter objects if they expose a name
+                try:
+                    self.dim_names = [getattr(p, 'name', None) for p in self.parameters]
+                except Exception:
+                    pass
+            except Exception:
+                # fallback to computing bounds from X
+                X = np.asarray(X)
+                self.bounds = np.column_stack((np.min(X, axis=0), np.max(X, axis=0)))
+        else:
+            X = np.asarray(X)
+            self.bounds = np.column_stack((np.min(X, axis=0), np.max(X, axis=0)))
+        return self
+
+    def transform(self, X):
+        is_df = isinstance(X, pd.DataFrame)
+        X_arr = X.values if is_df else np.asarray(X)
+        mins = self.bounds[:, 0]
+        maxs = self.bounds[:, 1]
+        # guard against zero-width bounds
+        ranges = maxs - mins
+        ranges[ranges == 0] = 1.0
+        X_scaled = (X_arr - mins) / ranges
+        if self._output_type == 'pandas':
+            columns = self.dim_names if self.dim_names is not None else (X.columns if is_df else None)
+            return pd.DataFrame(X_scaled, index=X.index if is_df else None, columns=columns)
+        else:
+            return X_scaled
+
+    def inverse_transform(self, X_scaled):
+        is_df = isinstance(X_scaled, pd.DataFrame)
+        X_arr = X_scaled.values if is_df else np.asarray(X_scaled)
+        mins = self.bounds[:, 0]
+        maxs = self.bounds[:, 1]
+        ranges = maxs - mins
+        ranges[ranges == 0] = 1.0
+        X_orig = X_arr * ranges + mins
+        if self._output_type == 'pandas':
+            columns = self.dim_names if self.dim_names is not None else (X_scaled.columns if is_df else None)
+            return pd.DataFrame(X_orig, index=X_scaled.index if is_df else None, columns=columns)
+        else:
+            return X_orig
+
+    def fit_transform(self, X, y=None):
+        return self.fit(X, y).transform(X)
+

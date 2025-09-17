@@ -4,6 +4,7 @@
 
 from ax import Client
 
+from ipykernel.pickleutil import istype
 import pandas as pd
 import torch
 from torch import Tensor
@@ -11,9 +12,11 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from ax import RangeParameterConfig
+from sklearn.preprocessing import FunctionTransformer
 
+from .ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
 
-from .ax_helper import get_train_Xy, get_obs_from_client
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -21,62 +24,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float64
 
 
-def mock_data() -> pd.DataFrame:
-    """Generate mock data for testing."""
-    np.random.seed(42)
-    X = np.random.uniform(0, 10, size=(20, 3))
-
-    # Define functions
-    def logistic(x):
-        return 1 / (1 + np.exp(-x))
-
-    def linear(x):
-        return 2 * x
-
-    def exponential(x):
-        return np.exp(0.3 * x)
-
-    # Calculate response as sum of logistic, linear, and exponential for each dimension
-    response = logistic(X[:, 0]) + linear(X[:, 1]) + exponential(X[:, 2])
-
-    # Create DataFrame
-    mock_df = pd.DataFrame(X, columns=["x1", "x2", "x3"])
-    mock_df["response"] = response
-
-    return mock_df
-
-
-def mock_client(df: pd.DataFrame) -> Client:
-    from ax import Client, RangeParameterConfig
-
-    # Generate mock data
-
-    param_names = [col for col in df.columns if col != "response"]
-
-    client = Client()
-
-    client.configure_experiment(
-        name="mock_experiment",
-        parameters=[
-            RangeParameterConfig(
-                name=name,
-                bounds=(0, 10),
-                parameter_type="float",
-            )
-            for name in param_names
-        ],
-    )
-
-    client.configure_optimization(objective="response")
-
-    for _, row in df.iterrows():
-        params = {name: float(row[name]) for name in param_names}
-        trial_index = client.attach_trial(params)
-        client.complete_trial(
-            trial_index, raw_data={"response": (float(row["response"]), 0.1)}
-        )
-
-    return client
 
 
 def subplot_dims(n) -> tuple[int, int]:
@@ -92,6 +39,7 @@ class GPVisualiser:
         obs: pd.DataFrame,
         dim_cols: list[str],
         response_col="response",
+        feature_range_params: RangeParameterConfig = None,
     ) -> None:
 
         if not callable(gp):
@@ -110,22 +58,43 @@ class GPVisualiser:
         self.response_col = response_col
 
         mask_na = obs[response_col].isna()
+
         self.predict_X = obs.loc[mask_na, dim_cols]
         self.predict_y = obs.loc[mask_na, response_col]
 
         self.obs_X = obs.loc[~mask_na, dim_cols]
         self.obs_y = obs.loc[~mask_na, response_col]
 
+        
+        if feature_range_params is not None:
+            self.scaler = UnitCubeScaler(ax_parameters=feature_range_params)
+        else:
+            self.scaler = FunctionTransformer(lambda x: x, validate=False)
 
 
-        train_X = torch.tensor(self.obs_X.values, dtype=dtype, device=device)
+        self.scaler.set_output(transform="pandas")
+
+        self.gp = self._train_gp(gp)
+        self.subplot_dims = subplot_dims(self.obs_X.shape[1])
+
+        self.fig = None
+
+    def _train_gp(self, gp: callable):
+        """Train the GP model using the observed data."""
+        train_X = self.scaler.fit_transform(self.obs_X.values)
+
+        if istype(train_X, pd.DataFrame):
+            train_X = train_X.values
+
+        train_X = torch.tensor(train_X, dtype=dtype, device=device)
         train_Y = torch.tensor(self.obs_y.values, dtype=dtype, device=device).unsqueeze(
             -1
         )
 
-        self.gp = gp(train_X, train_Y)
-        self.subplot_dims = subplot_dims(self.obs_X.shape[1])
-        self.fig = None
+        return gp(train_X, train_Y)
+        
+
+    
 
     def _create_linspace(self, num_points: int = 100) -> list[Tensor]:
         linspaces = []
@@ -142,9 +111,12 @@ class GPVisualiser:
     
     def _eval_gp(self, test_X:Tensor) -> tuple[Tensor, Tensor]:
         """Evaluate the GP model at given test points."""
-        if not isinstance(test_X, Tensor):
-            test_X = torch.tensor(self.predict_X.values, dtype=dtype, device=device)
-        
+
+        test_X = pd.DataFrame(self.scaler.transform(test_X))
+
+
+        test_X = torch.tensor(test_X.values, dtype=dtype, device=device)
+
         with torch.no_grad():
             posterior = self.gp.posterior(test_X)
             mean = posterior.mean.squeeze()
@@ -194,14 +166,10 @@ class GPVisualiser:
 
         # Normalize coordinates into a torch.Tensor (avoid torch.tensor(tensor))
         if isinstance(coordinates, pd.Series):
-            coordinates = coordinates[
-                [col for col in coordinates.index if col != self.response_col]
-            ].values
             coordinates = torch.tensor(coordinates)
         elif isinstance(coordinates, np.ndarray):
             coordinates = torch.tensor(coordinates)
-        elif isinstance(coordinates, torch.Tensor):
-            coordinates = torch.tensor(coordinates)
+
 
         self.fig, axs = self._create_subplots()
 
@@ -244,7 +212,7 @@ class GPVisualiser:
             GPVisualiser._get_euclidean_distance(coordinates, row_coord)
             for row_coord in obs.values
         ]
-        return torch.tensor([(1 - d / max(distances)) for d in distances], dtype=dtype)
+        return torch.tensor([(1 - d / max(distances+[0.001])) for d in distances], dtype=dtype)
     
 
     def _add_expected_improvement(self, ax:plt.Axes, dim:str, coordinates:Tensor):
@@ -280,8 +248,9 @@ class GPVisualiserMatplotlib(GPVisualiser):
                     fmt='',
                     color='red',
                     linestyle='--',
-                    alpha=0.8,
-                    linewidth=sz * 4 + 1,
+                    alpha=0.3,
+                    linewidth=sz * 4+0.1,
+                    capsize=sz * 4+0.1,
                     label='Predicted (selected point)',
                 )
 
@@ -356,23 +325,56 @@ class GPVisualiserMatplotlib(GPVisualiser):
 
 
 if __name__ == "__main__":
-    # Generate 20 datapoints in 3 dimensions
+    from toy_functions import ResponseFunction
     from botorch.models import SingleTaskGP
 
-    from GPVisualiser import mock_data, get_train_Xy
 
-    dim_cols = ["x1", "x2", "x3"]
-    df = mock_data()
-    # Add a few datapoints without response to mock data
-    for i in range(3):
-        new_row = {col: np.random.uniform(0, 10) for col in dim_cols}
-        new_row["response"] = np.nan
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    
+    dim_names = ["x0","x1"]
+    dim_names = [f"x{i}" for i in range(len(dim_names))]
+    simple_func = lambda x: sum(torch.sqrt(x))
 
-    gp = SingleTaskGP(*get_train_Xy(df, dim_cols))
-    plotter = GPVisualiserMatplotlib(SingleTaskGP, df, dim_cols)
-    plotter.plot_all(coordinates=[8, 8, 8])
+    resp = ResponseFunction(simple_func, len(dim_names))
+    resp.evaluate(torch.tensor([1., 4]))
 
+    client = Client()
+
+    parameters=[
+        RangeParameterConfig(
+            name=dim,
+            bounds=(1, 100),
+            parameter_type="float",
+            # scaling = 'log',
+        ) for dim in dim_names
+    ]
+
+
+    client.configure_experiment(
+        name="batch_bo_test",
+        parameters=parameters
+    )
+
+
+    client.configure_optimization(objective="response")
+
+    client.get_next_trials(max_trials=10)
+
+
+
+
+    for i, trial in get_obs_from_client(client, response_col='response').iterrows():
+        if not pd.isna(trial['response']):
+            continue
+
+        response = resp.evaluate(trial[dim_names])
+        client.complete_trial(trial_index=i, raw_data={"response": float(response)})
+
+
+
+
+    client.get_next_trials(max_trials=6)
+
+    obs = get_obs_from_client(client, response_col='response')
+    plotter = GPVisualiserMatplotlib(SingleTaskGP, obs, dim_names, 'response', parameters)
+    plotter.plot_all(coordinates=torch.tensor([10.0, 10.0]))
     plt.show()
     None
