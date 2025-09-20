@@ -99,12 +99,21 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
             return np.array([p.bounds for p in parameters])
         return None
 
-    def set_output(self, transform=None):
-        # Accepts 'pandas' or 'default' (numpy)
-        if transform == 'pandas':
-            self._output_type = 'pandas'
+    def set_output(self, *, transform: Optional[str] = None):  # sklearn >=1.2 style
+        """Set output container type.
+
+        Parameters
+        ----------
+        transform : {'pandas', 'default', None}
+            If 'pandas', subsequent transform calls return a pandas DataFrame.
+            If 'default' or None, returns a numpy ndarray.
+        """
+        if transform == "pandas":
+            self._output_type = "pandas"
+        elif transform in {None, "default"}:
+            self._output_type = "default"
         else:
-            self._output_type = 'default'
+            raise ValueError("transform must be one of {'pandas','default',None}")
         return self
 
     def fit(self, X, y=None):
@@ -141,11 +150,17 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         ranges = maxs - mins
         ranges[ranges == 0] = 1.0
         X_scaled = (X_arr - mins) / ranges
-        if self._output_type == 'pandas':
-            columns = self.dim_names if self.dim_names is not None else (X.columns if is_df else None)
-            return pd.DataFrame(X_scaled, index=X.index if is_df else None, columns=columns)
-        else:
-            return X_scaled
+        if self._output_type == "pandas":
+            # Column names preference: self.dim_names (if set) else passed DataFrame columns else generic names
+            if self.dim_names is not None:
+                columns = list(self.dim_names)
+            elif is_df:
+                columns = list(X.columns)
+            else:
+                columns = [f"x{i}" for i in range(X_scaled.shape[1])]
+            index = X.index if is_df else None
+            return pd.DataFrame(X_scaled, index=index, columns=columns)
+        return X_scaled
 
     def inverse_transform(self, X_scaled):
         is_df = isinstance(X_scaled, pd.DataFrame)
@@ -155,12 +170,34 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         ranges = maxs - mins
         ranges[ranges == 0] = 1.0
         X_orig = X_arr * ranges + mins
-        if self._output_type == 'pandas':
-            columns = self.dim_names if self.dim_names is not None else (X_scaled.columns if is_df else None)
+        if self._output_type == "pandas":
+            if self.dim_names is not None:
+                columns = list(self.dim_names)
+            elif is_df:
+                columns = list(X_scaled.columns)
+            else:
+                columns = [f"x{i}" for i in range(X_orig.shape[1])]
             return pd.DataFrame(X_orig, index=X_scaled.index if is_df else None, columns=columns)
-        else:
-            return X_orig
+        return X_orig
 
     def fit_transform(self, X, y=None):
         return self.fit(X, y).transform(X)
+
+    # sklearn feature name interface
+    def get_feature_names_out(self, input_features: Optional[Sequence[str]] = None):
+        """Return feature names in the correct order for pandas output.
+
+        If the scaler has learned `dim_names`, use them; otherwise base on
+        provided `input_features` or generate generic names.
+        """
+        if self.dim_names is not None:
+            return np.array(list(self.dim_names), dtype=object)
+        if input_features is not None:
+            return np.array(list(input_features), dtype=object)
+        # fallback generic naming
+        if self.bounds is not None:
+            n = self.bounds.shape[0]
+        else:
+            n = 0
+        return np.array([f"x{i}" for i in range(n)], dtype=object)
 

@@ -247,10 +247,10 @@ class GPVisualiserMatplotlib(GPVisualiser):
                     yerr=2 * si,
                     fmt='',
                     color='red',
-                    linestyle='--',
+     
                     alpha=0.3,
-                    linewidth=sz * 4+0.1,
-                    capsize=sz * 4+0.1,
+                    linewidth=sz * 1+0.1,
+                    capsize=sz * 1+0.1,
                     label='Predicted (selected point)',
                 )
 
