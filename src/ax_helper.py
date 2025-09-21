@@ -1,20 +1,27 @@
-from ax import Client
-
 from typing import Literal, Optional, Sequence, Tuple, Any
-import ax
-from ax.core import trial
 import pandas as pd
-from torch import Tensor
-import torch
 import numpy as np
+import torch
+from torch import Tensor
 from sklearn.base import BaseEstimator, TransformerMixin
-from ax import RangeParameterConfig
+
+from ax import Client
+from ax.core import trial
+from ax.api.configs import RangeParameterConfig
+from ax.generation_strategy.generation_strategy import GenerationStrategy
+from ax.generation_strategy.generation_node import GenerationNode
+from ax.generation_strategy.center_generation_node import CenterGenerationNode
+from ax.generation_strategy.transition_criterion import MinTrials
+from ax.generation_strategy.generator_spec import GeneratorSpec
+from ax.adapter.registry import Generators
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float64
 
 
-def safe_get(df: pd.DataFrame, key: str, index: int, axis: int = 0, default: Any = torch.nan) -> Any:
+def safe_get(
+    df: pd.DataFrame, key: str, index: int, axis: int = 0, default: Any = torch.nan
+) -> Any:
     """Safely get a value from `df.loc[index, key]`.
 
     Returns `default` when the key/index is missing.
@@ -25,7 +32,9 @@ def safe_get(df: pd.DataFrame, key: str, index: int, axis: int = 0, default: Any
         return default
 
 
-def get_guess_coords(client: Client, output_format: Literal["df", "tensor"] = "df") -> Any:
+def get_guess_coords(
+    client: Client, output_format: Literal["df", "tensor"] = "df"
+) -> Any:
     """Return guesses (arm parameters) from an Ax `client`.
 
     Parameters
@@ -39,7 +48,9 @@ def get_guess_coords(client: Client, output_format: Literal["df", "tensor"] = "d
     """
     full_df = pd.DataFrame()
     for index, trial in client._experiment.trials.items():
-        df = pd.DataFrame({"trial_name": trial.arm.name, **trial.arm.parameters}, index=[index])
+        df = pd.DataFrame(
+            {"trial_name": trial.arm.name, **trial.arm.parameters}, index=[index]
+        )
         full_df = pd.concat([full_df, df], ignore_index=True)
     if output_format.lower() == "df":
         return full_df
@@ -47,7 +58,6 @@ def get_guess_coords(client: Client, output_format: Literal["df", "tensor"] = "d
         # exclude string-like columns (e.g., trial_name) when building tensor
         numeric_cols = [c for c in full_df.columns if c != "trial_name"]
         return torch.as_tensor(full_df[numeric_cols].values, dtype=dtype, device=device)
-    
 
 
 def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
@@ -63,7 +73,9 @@ def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
     return obs
 
 
-def get_train_Xy(trial_df: pd.DataFrame, dim_cols: Sequence[str], response_col: str = "response") -> Tuple[Tensor, Tensor]:
+def get_train_Xy(
+    trial_df: pd.DataFrame, dim_cols: Sequence[str], response_col: str = "response"
+) -> Tuple[Tensor, Tensor]:
     """Extract training tensors X and y from an observation DataFrame.
 
     Returns
@@ -80,6 +92,7 @@ def get_train_Xy(trial_df: pd.DataFrame, dim_cols: Sequence[str], response_col: 
     train_Y = torch.as_tensor(y_vals, dtype=dtype, device=device).unsqueeze(-1)
     return train_X, train_Y
 
+
 class UnitCubeScaler(BaseEstimator, TransformerMixin):
     """Scale parameters to/from the unit hypercube.
 
@@ -87,10 +100,15 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
     at construction. If provided, their `.bounds` are used during `fit` and
     `transform`.
     """
-    def __init__(self, ax_parameters: Optional[Sequence[RangeParameterConfig]] = None) -> None:
+
+    def __init__(
+        self, ax_parameters: Optional[Sequence[RangeParameterConfig]] = None
+    ) -> None:
         # store provided parameters for later use in fit
         self.parameters = ax_parameters
-        self.bounds: Optional[np.ndarray] = self._get_bounds(ax_parameters) if ax_parameters is not None else None
+        self.bounds: Optional[np.ndarray] = (
+            self._get_bounds(ax_parameters) if ax_parameters is not None else None
+        )
         self._output_type = "default"
         self.dim_names: Optional[Sequence[str]] = None
 
@@ -129,7 +147,7 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
                 self.bounds = np.array([p.bounds for p in self.parameters])
                 # also set dim_names from parameter objects if they expose a name
                 try:
-                    self.dim_names = [getattr(p, 'name', None) for p in self.parameters]
+                    self.dim_names = [getattr(p, "name", None) for p in self.parameters]
                 except Exception:
                     pass
             except Exception:
@@ -177,7 +195,9 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
                 columns = list(X_scaled.columns)
             else:
                 columns = [f"x{i}" for i in range(X_orig.shape[1])]
-            return pd.DataFrame(X_orig, index=X_scaled.index if is_df else None, columns=columns)
+            return pd.DataFrame(
+                X_orig, index=X_scaled.index if is_df else None, columns=columns
+            )
         return X_orig
 
     def fit_transform(self, X, y=None):
@@ -201,3 +221,97 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
             n = 0
         return np.array([f"x{i}" for i in range(n)], dtype=object)
 
+
+def construct_generation_strategy(
+    generator_spec: GeneratorSpec, node_name: str, transition_trials: int = 5
+) -> GenerationStrategy:
+    """Constructs a Center + Sobol + Modular BoTorch `GenerationStrategy`
+    using the provided `generator_spec` for the Modular BoTorch node.
+    """
+    botorch_node = GenerationNode(
+        node_name=node_name,
+        generator_specs=[generator_spec],
+    )
+
+    # Sobol for initial space exploration
+    sobol_node = GenerationNode(
+        node_name="Sobol",
+        generator_specs=[
+            GeneratorSpec(
+                generator_enum=Generators.SOBOL,
+            ),
+        ],
+        transition_criteria=[
+            # Transition to BoTorch node once there are `transition_trials` trials on the experiment.
+            MinTrials(
+                threshold=transition_trials,
+                transition_to=botorch_node.node_name,
+                use_all_trials_in_exp=True,
+            )
+        ],
+    )
+    # Center node is a customized node that uses a simplified logic and has a
+    # built-in transition criteria that transitions after generating once.
+    center_node = CenterGenerationNode(next_node_name=sobol_node.node_name)
+    return GenerationStrategy(
+        name=f"Center+Sobol+{node_name}", nodes=[center_node, sobol_node, botorch_node]
+    )
+
+
+class BatchClientHandler:
+    def __init__(
+        self,
+        client: Client,
+        response_function: callable,
+        dim_names: str,
+        response_col: str = "response",
+        batch_size=8,
+        range_params: Optional[Sequence[RangeParameterConfig]] = None,
+    ):
+        self.client = client
+        self.response_function = response_function
+        self.dim_names = dim_names
+        self.response_col = response_col
+        self.batch_size = batch_size
+        self.range_params = range_params
+
+    def get_next_batch(self, batch_size: int = None):
+        """Request the next batch of trials from the Ax client."""
+        if batch_size is None:
+            batch_size = self.batch_size
+        self.client.get_next_trials(max_trials=batch_size)
+
+    def complete_all_pending(self):
+        """Complete all pending trials by evaluating the response function."""
+        for i, trial in get_obs_from_client(
+            self.client, response_col=self.response_col
+        ).iterrows():
+            if not pd.isna(trial[self.response_col]):
+                continue
+
+            response = self.response_function(**trial[self.dim_names])
+            self.client.complete_trial(
+                trial_index=i, raw_data={self.response_col: float(response)}
+            )
+
+    def get_pending_trials(self):
+        """Return a DataFrame of pending trials (no observed response yet)."""
+        obs_df = self.get_observations()
+        pending_mask = pd.isna(obs_df[self.response_col])
+        return obs_df.loc[pending_mask]
+
+    def get_observations(self):
+        """Return a DataFrame of all trials with observed responses."""
+        return get_obs_from_client(self.client, response_col=self.response_col)
+
+    def plot_GP(self, gp: callable, coords=None):
+        from .GPVisualiser import GPVisualiserMatplotlib
+
+        obs = self.get_observations()
+        plotter = GPVisualiserMatplotlib(gp, obs, self.dim_names, self.response_col, feature_range_params=self.range_params)
+
+        if coords is None:
+            coords = obs.loc[obs[self.response_col].idxmax(), self.dim_names].tolist()
+
+        plotter.plot_all(coords)
+        return plotter

@@ -68,11 +68,12 @@ class GPVisualiser:
         
         if feature_range_params is not None:
             self.scaler = UnitCubeScaler(ax_parameters=feature_range_params)
+            self.scaler.set_output(transform="pandas")
         else:
             self.scaler = FunctionTransformer(lambda x: x, validate=False)
 
 
-        self.scaler.set_output(transform="pandas")
+        
 
         self.gp = self._train_gp(gp)
         self.subplot_dims = subplot_dims(self.obs_X.shape[1])
