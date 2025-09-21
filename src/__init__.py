@@ -7,5 +7,6 @@ from . import (
     gausian_helper,
     GPVisualiser,
     toy_functions,
+    model_generation
     
 )

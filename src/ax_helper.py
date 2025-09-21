@@ -222,40 +222,7 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         return np.array([f"x{i}" for i in range(n)], dtype=object)
 
 
-def construct_generation_strategy(
-    generator_spec: GeneratorSpec, node_name: str, transition_trials: int = 5
-) -> GenerationStrategy:
-    """Constructs a Center + Sobol + Modular BoTorch `GenerationStrategy`
-    using the provided `generator_spec` for the Modular BoTorch node.
-    """
-    botorch_node = GenerationNode(
-        node_name=node_name,
-        generator_specs=[generator_spec],
-    )
 
-    # Sobol for initial space exploration
-    sobol_node = GenerationNode(
-        node_name="Sobol",
-        generator_specs=[
-            GeneratorSpec(
-                generator_enum=Generators.SOBOL,
-            ),
-        ],
-        transition_criteria=[
-            # Transition to BoTorch node once there are `transition_trials` trials on the experiment.
-            MinTrials(
-                threshold=transition_trials,
-                transition_to=botorch_node.node_name,
-                use_all_trials_in_exp=True,
-            )
-        ],
-    )
-    # Center node is a customized node that uses a simplified logic and has a
-    # built-in transition criteria that transitions after generating once.
-    center_node = CenterGenerationNode(next_node_name=sobol_node.node_name)
-    return GenerationStrategy(
-        name=f"Center+Sobol+{node_name}", nodes=[center_node, sobol_node, botorch_node]
-    )
 
 
 class BatchClientHandler:
