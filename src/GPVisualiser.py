@@ -154,7 +154,7 @@ class GPVisualiser:
         return torch.dist(point1, point2).item()
 
     def plot_all(
-        self, coordinates: list[float] | Tensor | pd.Series, linspace=None
+        self, coordinates: list[float] | Tensor | pd.Series, linspace=None, figsize=(12,6)
     ) -> None:
         """Handle plotting all dimensions. One subplot per dimension.
         Requires definition of:
@@ -172,7 +172,7 @@ class GPVisualiser:
             coordinates = torch.tensor(coordinates)
 
 
-        self.fig, axs = self._create_subplots()
+        self.fig, axs = self._create_subplots(figsize=figsize)
 
         linspace = self._create_linspace(100) if linspace is None else linspace
 
@@ -279,9 +279,9 @@ class GPVisualiserMatplotlib(GPVisualiser):
 
 
 
-    def _create_subplots(self):
-        fig, axs = plt.subplots(*self.subplot_dims, figsize=(12, 6))
-        axs = axs.flatten()
+    def _create_subplots(self, figsize=(12,6)):
+        fig, axs = plt.subplots(*self.subplot_dims, figsize=figsize)
+        axs = axs.flatten() if self.obs_X.shape[1] > 1 else [axs]
         return fig, axs
 
     def _add_subplot_elements(self, rounded_coords):

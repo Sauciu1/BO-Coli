@@ -222,9 +222,6 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         return np.array([f"x{i}" for i in range(n)], dtype=object)
 
 
-
-
-
 class BatchClientHandler:
     def __init__(
         self,
@@ -235,12 +232,12 @@ class BatchClientHandler:
         batch_size=8,
         range_params: Optional[Sequence[RangeParameterConfig]] = None,
     ):
-        self.client = client
-        self.response_function = response_function
-        self.dim_names = dim_names
-        self.response_col = response_col
-        self.batch_size = batch_size
-        self.range_params = range_params
+        self.client: Client = client
+        self.response_function: callable = response_function
+        self.dim_names: list[str] = dim_names
+        self.response_col: str = response_col
+        self.batch_size: int = batch_size
+        self.range_params: Optional[Sequence[RangeParameterConfig]] = range_params
 
     def get_next_batch(self, batch_size: int = None):
         """Request the next batch of trials from the Ax client."""
@@ -271,14 +268,52 @@ class BatchClientHandler:
         """Return a DataFrame of all trials with observed responses."""
         return get_obs_from_client(self.client, response_col=self.response_col)
 
-    def plot_GP(self, gp: callable, coords=None):
+    def plot_GP(self, gp: callable, coords=None, **kwargs):
         from .GPVisualiser import GPVisualiserMatplotlib
 
         obs = self.get_observations()
-        plotter = GPVisualiserMatplotlib(gp, obs, self.dim_names, self.response_col, feature_range_params=self.range_params)
+        plotter = GPVisualiserMatplotlib(
+            gp,
+            obs,
+            self.dim_names,
+            self.response_col,
+            feature_range_params=self.range_params,
+        )
 
         if coords is None:
             coords = obs.loc[obs[self.response_col].idxmax(), self.dim_names].tolist()
 
-        plotter.plot_all(coords)
+        plotter.plot_all(coords, **kwargs)
         return plotter
+
+
+    def comp_noise_and_repeats(
+        self,
+        noise_fn: callable = None,
+        repeats: int = 1,
+    ):
+        """Apply noise function to all running trials, and repeat each trial a specified number of times."""
+
+        for index, trial in list(self.client._experiment.trials.items()):
+
+            if not trial.status.is_running:
+                continue
+            params = trial.arms[0].parameters
+
+            def response(coords):
+                return noise_fn(self.response_function(**coords))
+
+            self.client.complete_trial(
+                index, raw_data={self.response_col: response(params)}
+            )
+
+            for _ in range(repeats - 1):
+                self.client.attach_trial(
+                    parameters=params,
+                    arm_name=trial.arm.name,
+                )
+
+                self.client.complete_trial(
+                    trial_index=len(self.client._experiment.trials) - 1,
+                    raw_data={self.response_col: response(params)},
+                )
