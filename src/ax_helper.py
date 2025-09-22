@@ -69,6 +69,7 @@ def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
     """
     obs = get_guess_coords(client, output_format="df")
     results = client._experiment.fetch_data().df
+    
     obs[response_col] = obs.index.map(lambda index: safe_get(results, "mean", index))
     return obs
 
