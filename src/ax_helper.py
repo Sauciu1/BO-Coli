@@ -305,7 +305,7 @@ class BatchClientHandler:
             params = trial.arms[0].parameters
 
             def response(coords):
-                return noise_fn(self.response_function(**coords))
+                return float(noise_fn(self.response_function(**coords)))
 
             self.client.complete_trial(
                 index, raw_data={self.response_col: response(params)}

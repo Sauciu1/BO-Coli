@@ -207,19 +207,16 @@ class GPVisualiser:
     
     def _get_distance_to_plane(self, obs:pd.DataFrame, coord:Tensor, fixed_dim:int) -> Tensor:
         """get distance from each observation to the plane parallel to fixed_dim and passing through coord"""
-        obs = obs.copy()
- 
 
-        obs_vals = torch.as_tensor(
-            obs.iloc[:, fixed_dim].to_numpy(),
-            dtype=dtype
-        )  # (N,)
+        if not isinstance(obs, Tensor):
+            obs = torch.tensor(obs.values, dtype=dtype)
+        if not isinstance(coord, Tensor):
+            coord = torch.tensor(coord, dtype=dtype)
 
-        coord = torch.as_tensor(coord)
-        c = coord[..., fixed_dim]  # ( ) if scalar, (D,) -> (), (B, D) -> (B,)
+        obs[:, fixed_dim] = coord[fixed_dim]
 
-        # Broadcast to (..., N) and take absolute difference (distance to axis-aligned plane)
-        dist = (obs_vals - c.unsqueeze(-1)) if c.ndim > 0 else (obs_vals - c)
+
+        dist = torch.sqrt(torch.sum(torch.pow(torch.subtract(obs, coord), 2), dim=1)) 
         return dist.abs()
 
 
