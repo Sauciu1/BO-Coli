@@ -205,15 +205,32 @@ class GPVisualiser:
 
         return self.fig, axs
     
+    def _get_distance_to_plane(self, obs:pd.DataFrame, coord:Tensor, fixed_dim:int) -> Tensor:
+        """get distance from each observation to the plane parallel to fixed_dim and passing through coord"""
+        obs = obs.copy()
+ 
+
+        obs_vals = torch.as_tensor(
+            obs.iloc[:, fixed_dim].to_numpy(),
+            dtype=dtype
+        )  # (N,)
+
+        coord = torch.as_tensor(coord)
+        c = coord[..., fixed_dim]  # ( ) if scalar, (D,) -> (), (B, D) -> (B,)
+
+        # Broadcast to (..., N) and take absolute difference (distance to axis-aligned plane)
+        dist = (obs_vals - c.unsqueeze(-1)) if c.ndim > 0 else (obs_vals - c)
+        return dist.abs()
 
 
 
-    def _get_size(self, obs:pd.DataFrame, coordinates:Tensor) -> list[float]:
-        distances = [
-            GPVisualiser._get_euclidean_distance(coordinates, row_coord)
-            for row_coord in obs.values
-        ]
-        return torch.tensor([(1 - d / max(distances+[0.001])) for d in distances], dtype=dtype)
+    def _get_size(self, obs:pd.DataFrame, coordinates:Tensor, dim) -> list[float]:
+        if not isinstance(dim, int):
+            dim = self.obs_X.columns.get_loc(dim)
+
+        distances =  self._get_distance_to_plane(obs, coordinates, dim)
+
+        return torch.tensor([(1 - d / max(distances+torch.tensor([0.001], dtype=dtype))) for d in distances], dtype=dtype)
     
 
     def _add_expected_improvement(self, ax:plt.Axes, dim:str, coordinates:Tensor):
@@ -222,7 +239,7 @@ class GPVisualiser:
         
         dim_x = self.predict_X.loc[:, dim]
 
-        sizes = self._get_size(self.predict_X, coordinates)
+        sizes = self._get_size(self.predict_X, coordinates, dim)
 
         self._plot_expected_improvement(ax, dim_x, mean, std, sizes)
 
@@ -308,8 +325,8 @@ class GPVisualiserMatplotlib(GPVisualiser):
         coordinates,
     ) -> None:
         """Plot observed data points along a single dimension."""
-
-        point_size = self._get_size(self.obs_X, coordinates)
+        dim = self.obs_X.columns.get_loc(dim_name)
+        point_size = self._get_size(self.obs_X, coordinates, dim)
 
         sns.scatterplot(
             x=self.obs_X[dim_name],

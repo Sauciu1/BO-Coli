@@ -69,7 +69,7 @@ def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
     """
     obs = get_guess_coords(client, output_format="df")
     results = client._experiment.fetch_data().df
-    
+
     obs[response_col] = obs.index.map(lambda index: safe_get(results, "mean", index))
     return obs
 
@@ -244,6 +244,7 @@ class BatchClientHandler:
         """Request the next batch of trials from the Ax client."""
         if batch_size is None:
             batch_size = self.batch_size
+
         self.client.get_next_trials(max_trials=batch_size)
 
     def complete_all_pending(self):
@@ -261,18 +262,21 @@ class BatchClientHandler:
 
     def get_pending_trials(self):
         """Return a DataFrame of pending trials (no observed response yet)."""
-        obs_df = self.get_observations()
+        obs_df = self.get_batch_observations()
         pending_mask = pd.isna(obs_df[self.response_col])
         return obs_df.loc[pending_mask]
 
-    def get_observations(self):
+    def get_batch_observations(self):
         """Return a DataFrame of all trials with observed responses."""
-        return get_obs_from_client(self.client, response_col=self.response_col)
+        obs =  get_obs_from_client(self.client, response_col=self.response_col)
+        obs['trial_index'] = obs['trial_name'].apply(lambda x: x.split('_')[0]).astype(int)
+        #del obs['trial_name']
+        return obs
 
     def plot_GP(self, gp: callable, coords=None, **kwargs):
         from .GPVisualiser import GPVisualiserMatplotlib
 
-        obs = self.get_observations()
+        obs = self.get_batch_observations()
         plotter = GPVisualiserMatplotlib(
             gp,
             obs,
@@ -286,7 +290,6 @@ class BatchClientHandler:
 
         plotter.plot_all(coords, **kwargs)
         return plotter
-
 
     def comp_noise_and_repeats(
         self,
@@ -308,7 +311,7 @@ class BatchClientHandler:
                 index, raw_data={self.response_col: response(params)}
             )
 
-            for _ in range(repeats - 1):
+            for i in range(repeats - 1):
                 self.client.attach_trial(
                     parameters=params,
                     arm_name=trial.arm.name,
