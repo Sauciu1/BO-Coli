@@ -14,9 +14,29 @@ from ax.generation_strategy.center_generation_node import CenterGenerationNode
 from ax.generation_strategy.transition_criterion import MinTrials
 from ax.generation_strategy.generator_spec import GeneratorSpec
 from ax.adapter.registry import Generators
+import logging
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.float64
+
+
+
+def silence_ax_client():
+    lg = logging.getLogger("ax.api.client")
+    lg.setLevel(logging.CRITICAL)      # or logging.ERROR
+    lg.propagate = False
+    lg.handlers.clear()                # remove any handlers Ax attached
+
+# (Optional) also silence all other Ax loggers
+def silence_all_ax():
+    for name, obj in logging.root.manager.loggerDict.items():
+        if name.startswith("ax"):
+            lg = logging.getLogger(name)
+            lg.setLevel(logging.CRITICAL)
+            lg.propagate = False
+            lg.handlers.clear()
+
+silence_ax_client()
 
 
 def safe_get(
