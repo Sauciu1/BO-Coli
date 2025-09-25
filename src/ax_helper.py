@@ -30,7 +30,8 @@ from ax.generation_strategy.transition_criterion import MinTrials
 from ax.adapter.registry import Generators
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 dtype = torch.float64
 
 
@@ -510,7 +511,34 @@ def get_full_strategy(gp: callable, acqf_class: callable, kernel=None, transitio
 
     return generation_strategy
 
+
+
+
+def get_y_data(runs, dim_names, test_func):
+
+    df = runs.get_batch_observations().sort_values(by='trial_index', ascending=True)
+    df = df.groupby(["trial_index", *dim_names])['response'].mean().reset_index()
+
+    df['y_true'] = df[dim_names].apply(lambda r: float(test_func(*r.values)), axis=1)
+    df['error'] = df['response'] - df['y_true']
+    return df
+
+def get_above_percentile(df, max_val, percentile = 0.95):
+    cut_off = percentile*max_val
+    df = df[(df['response']>cut_off) & (df['y_true']>cut_off)]
+    return df
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     # Example usage
     gs = get_full_strategy(gp=SingleTaskGP, acqf_class=qLogExpectedImprovement)
     print(gs)
+
+
+

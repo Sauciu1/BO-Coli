@@ -98,6 +98,47 @@ class ResponseFunction:
 
 
 
+class Hartmann6D:
+    """Synthetic data from Hartmann-6 function (negated for maximization)."""
+    def __init__(self):
+
+
+        self._h6_alpha = torch.tensor([1.0, 1.2, 3.0, 3.2])
+        self._h6_A = torch.tensor([
+            [10,  3, 17,  3,  1, 11],
+            [ 0.05, 10, 17,  0.1, 8, 14],
+            [ 3,  3.5, 1.7, 10, 17, 8],
+            [17,  8,  0.05, 10, 0.1, 14],
+        ])
+        self._h6_P = 1e-4 * torch.tensor([
+            [1312, 1696, 5569, 124, 8283, 5886],
+            [2329, 4135, 8307, 3736, 1004, 9991],
+            [2348, 1451, 3522, 2883, 3047, 6650],
+            [4047, 8828, 8732, 5743, 1091, 381],
+        ])
+
+
+    def eval_at(self, x1, x2, x3, x4, x5, x6):
+        """
+        Hartmann-6 function (negated for maximization).
+        Usage:
+            hartmann6(x) where x is length-6 iterable in [0,1]
+            or hartmann6(x1, x2, x3, x4, x5, x6)
+        """
+        args = (x1, x2, x3, x4, x5, x6)
+        if len(args) == 1 and hasattr(args[0], "__len__"):
+            x = torch.as_tensor(args[0], dtype=torch.float32)
+        else:
+            x = torch.as_tensor(args, dtype=torch.float32)
+        if x.shape != (6,):
+            raise ValueError("hartmann6 expects 6-dimensional input.")
+        
+        
+        inner = torch.sum(self._h6_A * (x - self._h6_P) ** 2, dim=1)
+        value = -torch.sum(self._h6_alpha * torch.exp(-inner))  # standard (to be minimized)
+
+        return -value  # negate so higher is better
+
 if __name__ == "__main__":
     domain = [torch.linspace(0, 20, 100), torch.linspace(0, 20, 100), torch.linspace(0, 20, 100),
               torch.linspace(0, 20, 100), torch.linspace(0, 20, 100), torch.linspace(0, 20, 100)]
