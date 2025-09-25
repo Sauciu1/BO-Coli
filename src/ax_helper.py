@@ -525,7 +525,11 @@ def get_y_data(runs, dim_names, test_func):
 
 def get_above_percentile(df, max_val, percentile = 0.95):
     cut_off = percentile*max_val
-    df = df[(df['response']>cut_off) & (df['y_true']>cut_off)]
+    #df = df[(df['response']>cut_off) & (df['y_true']>cut_off)]
+    df["assumed_hit"] = df['response']>cut_off
+    df["true_hit"] = df['y_true']>cut_off
+
+
     return df
 
 

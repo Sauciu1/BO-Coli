@@ -1,4 +1,4 @@
-from  src import ax_helper
+from  src import ax_helper, model_generation
 from src.ax_helper import SequentialRuns
 from src.toy_functions import Hartmann6D
 import numpy as np
@@ -21,7 +21,7 @@ dim_names = [rp.name for rp in param_range]
 
 test_fn = Hartmann6D().eval_at
 
-
+from src.model_generation import GammaNoiseSGP
 
 def _single_run(params, n_runs = 30):
     tr, noise = params
@@ -31,7 +31,7 @@ def _single_run(params, n_runs = 30):
     
     local_tester = SequentialRuns(test_fn, param_range, dim_names, metric_name)
     runs = local_tester.run(
-        SingleTaskGP,
+        GammaNoiseSGP,
         n_runs=n_runs,
         technical_repeats=tr,
         batch_size=1,
@@ -50,14 +50,15 @@ import os
 print(__name__)
 mode = 'multicore'
 if __name__ == "__main__":
-    n_runs = 20
+    
+    n_runs = 100
     mp.set_start_method("spawn", force=True)  # Windows-safe
 
     t0 = time.perf_counter()
     print("Starting batch Bayesian optimization tests...")
 
     param_grid = [(tr, float(n)) for tr in range(1, 9) for n in np.linspace(0, 2.2, 12)]
-    n_workers = min(len(param_grid), os.cpu_count() or 1)
+    n_workers = min(len(param_grid), os.cpu_count()-4 or 1)
 
 
     with mp.get_context("spawn").Pool(processes=n_workers) as pool:
@@ -66,7 +67,7 @@ if __name__ == "__main__":
 
     r_n_dict = dict(zip(param_grid, results))
 
-    with open(save_dir + 'multicore_trial.pkl', 'wb') as f:
+    with open(save_dir + 'GammaNoiseSGP_noise_vs_t_repeats.pkl', 'wb') as f:
         pickle.dump(r_n_dict, f)
 
     elapsed = time.perf_counter() - t0
