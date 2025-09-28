@@ -1,0 +1,10 @@
+#PBS -l walltime=00:10:00
+#PBS -l select=1:ncpus=16:mem=128gb
+
+cd $BO-coli
+
+pip install poetry
+poetry lock
+poetry env activate
+poetry run python hello_world.py
+
