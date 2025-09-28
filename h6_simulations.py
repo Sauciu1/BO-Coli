@@ -21,17 +21,17 @@ dim_names = [rp.name for rp in param_range]
 
 test_fn = Hartmann6D().eval_at
 
-from src.model_generation import GammaNoiseSGP
+from src.model_generation import GammaNoiseSGP, HeteroNoiseSGP, HeteroWhiteSGP
 
 def _single_run(params, n_runs = 30):
     tr, noise = params
 
-    def noise_fn(x):
-        return x + np.random.normal(0, noise)
+    def noise_fn(x, y):
+        return y + np.random.normal(0, noise)
     
     local_tester = SequentialRuns(test_fn, param_range, dim_names, metric_name)
     runs = local_tester.run(
-        GammaNoiseSGP,
+        HeteroWhiteSGP,
         n_runs=n_runs,
         technical_repeats=tr,
         batch_size=1,
@@ -57,8 +57,8 @@ if __name__ == "__main__":
     t0 = time.perf_counter()
     print("Starting batch Bayesian optimization tests...")
 
-    param_grid = [(tr, float(n)) for tr in range(1, 9) for n in np.linspace(0, 2.2, 12)]
-    n_workers = min(len(param_grid), os.cpu_count()-4 or 1)
+    param_grid = [(tr, float(n)) for tr in range(1, 9, 2) for n in np.linspace(0, 1.1, 6)]
+    n_workers = min(len(param_grid), os.cpu_count()-2 or 1)
 
 
     with mp.get_context("spawn").Pool(processes=n_workers) as pool:
@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
     r_n_dict = dict(zip(param_grid, results))
 
-    with open(save_dir + 'GammaNoiseSGP_noise_vs_t_repeats.pkl', 'wb') as f:
+    with open(save_dir + 'singleGP_noise_vs_t_repeats_09_28.pkl', 'wb') as f:
         pickle.dump(r_n_dict, f)
 
     elapsed = time.perf_counter() - t0
