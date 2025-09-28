@@ -1,4 +1,5 @@
 from typing import Literal, Optional, Sequence, Tuple, Any
+from webbrowser import get
 import pandas as pd
 import numpy as np
 import torch
@@ -95,7 +96,7 @@ def get_guess_coords(
         return torch.as_tensor(full_df[numeric_cols].values, dtype=dtype, device=device)
 
 
-def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
+def get_obs_from_client(client: Client) -> pd.DataFrame:
     """Fetch existing trial parameter values and attach observed responses.
 
     The returned DataFrame contains the trial parameters (one row per trial)
@@ -104,8 +105,20 @@ def get_obs_from_client(client: Client, response_col: str) -> pd.DataFrame:
     """
     obs = get_guess_coords(client, output_format="df")
     results = client._experiment.fetch_data().df
+    response_col = list(client._experiment.metrics.keys())[0]
 
-    obs[response_col] = obs.index.map(lambda index: safe_get(results, "mean", index))
+    def get_ax_mean(result):
+        if result["trial_index"] ==80:
+            print(result)
+        if "mean" in result:
+            return result["mean"]
+        else:
+            return torch.nan
+
+    obs[response_col] = np.empty_like(obs.index, dtype=float)
+
+    obs[response_col] = results.reindex(obs.index)["mean"]
+    
     return obs
 
 
@@ -533,16 +546,10 @@ def get_above_percentile(df, max_val, percentile = 0.95):
     return df
 
 
-
-
-
-
-
-
 if __name__ == "__main__":
-    # Example usage
-    gs = get_full_strategy(gp=SingleTaskGP, acqf_class=qLogExpectedImprovement)
-    print(gs)
+    json_path = r"data/ax_clients/hartmann6_runs.json"
+    client = Client().load_from_json_file(json_path)
+    get_obs_from_client(client)
 
 
 
