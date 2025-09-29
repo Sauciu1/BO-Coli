@@ -82,7 +82,7 @@ def run_grid(save_path ):
 
 if __name__ == "__main__":
     save_dir = "data/bayes_sim/"
-    save_PATH = save_dir + 'PBS_test_vs_t_repeats_09_28.pkl'
+    save_PATH = save_dir + 'HeteroWhite_09_29.pkl'
 
     run_grid(save_PATH)
     # Runtime for sequential runs : 112s
