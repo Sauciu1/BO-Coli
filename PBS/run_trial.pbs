@@ -1,12 +1,19 @@
-#PBS -l walltime=10:00:00
-#PBS -l select=1:ncpus=128:mem=300gb
+#!/bin/bash
+#PBS -l select=1:ncpus=64:mem=256gb -l walltime=12:15:00
 
-cd $BO-coli
 
-conda create -n "bo_coli" python=3.13.0 ipython
+
+cd povilas/BO-Coli
+
+source "$HOME/miniforge3/etc/profile.d/conda.sh"
+
+conda create -y "bo_coli" python=3.13.0 ipython
 conda activate bo_coli
 conda install pip
 pip install poetry
+
+poetry lock
+
 poetry install --no-root
 poetry run python h6_simulations.py
 
