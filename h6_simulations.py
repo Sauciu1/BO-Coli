@@ -53,15 +53,15 @@ mode = 'multicore'
 
 
 def run_grid(save_path ):
-    n_runs = 100
+    n_runs = 80
     mp.set_start_method("spawn", force=True)  # Windows-safe
 
     t0 = time.perf_counter()
     print("Starting batch Bayesian optimization tests...")
 
     #param_grid = [(tr, float(n)) for tr in range(1, 9, 2) for n in np.linspace(0, 1.1, 6)]
-    param_grid = [(tr, n, f"again_{again}") for tr in range(1, 10, 2) for n in np.linspace(0, 2.2, 11) for again in range(1, 10)]
-    n_workers = min(len(param_grid), int(os.cpu_count()*0.8) or 1)
+    param_grid = [(tr, n, f"again_{again}") for tr in range(1, 10, 2) for n in np.linspace(0, 1.1, 6) for again in range(1, 7)]
+    n_workers = 64 #min(len(param_grid), int(os.cpu_count()*0.8) or 1)
 
 
     with mp.get_context("spawn").Pool(processes=n_workers) as pool:
