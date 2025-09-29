@@ -47,8 +47,6 @@ def _single_run(params, n_runs = 30):
 
 
 
-
-
 print(__name__)
 mode = 'multicore'
 
@@ -62,12 +60,12 @@ def run_grid(save_path ):
     print("Starting batch Bayesian optimization tests...")
 
     #param_grid = [(tr, float(n)) for tr in range(1, 9, 2) for n in np.linspace(0, 1.1, 6)]
-    param_grid = [(tr, float(n)) for tr in range(1, 2) for n in np.linspace(0, 0.3, 2)]
-    n_workers = min(len(param_grid), os.cpu_count() or 1)
+    param_grid = [(tr, n, f"again_{again}") for tr in range(1, 10, 2) for n in np.linspace(0, 2.2, 11) for again in range(1, 10)]
+    n_workers = min(len(param_grid), int(os.cpu_count()*0.8) or 1)
 
 
     with mp.get_context("spawn").Pool(processes=n_workers) as pool:
-        results = pool.starmap(_single_run, [(el, n_runs) for el in param_grid])
+        results = pool.starmap(_single_run, [(el[0:2], n_runs) for el in param_grid])
 
     r_n_dict = dict(zip(param_grid, results))
 
