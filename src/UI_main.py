@@ -64,8 +64,8 @@ class BayesDFManager():
         trial_dict = {trial:i for i, trial in enumerate(trial_instance.unique())}
 
         self.df['Group'] = trial_instance.map(trial_dict).astype(int)
-        #if len(trial_instance.unique()) != len(self.df):
-        #    batch = 
+        self.unique_trials = trial_dict
+
 
 
         return self.df
@@ -80,10 +80,12 @@ class BayesDFManager():
         return BayesDFManager(df, input_cols, response_col)
 
 
+
+
+
 json_path = r"data/ax_clients/hartmann6_runs.json"
 man_df =  BayesDFManager.load_from_json(json_path)
 print(man_df.get_batch_instance_repeat())
-
 
 
 
@@ -91,6 +93,7 @@ st.set_page_config(page_title="Excel-Style Data Editor", layout="wide")
 # Initialize session state with BayesDFManager and its DataFrame
 
 st.session_state.df = man_df.df
+
 
 
 st.info(f"Loaded Bayesian DF with {len(st.session_state.df)} rows and "
@@ -105,52 +108,22 @@ uploaded_file = st.file_uploader(
     help="Upload a .json file to load Bayesian optimization data."
 )
 
-        
+  
 
 
-# Display editable dataframe
-edited_df = st.data_editor(
-    st.session_state.df,
-    use_container_width=True,
-    num_rows="dynamic",
-    column_config=man_df.get_column_config(),
-    key="data_editor"
-)
+def df_runner(man_df):
+    # Display editable dataframe
+    edited_df = st.data_editor(
+        st.session_state.df,
+        use_container_width=True,
+        num_rows="dynamic",
+        column_config=man_df.get_column_config(),
 
-# Update session state with edited data
-st.session_state.df = edited_df
+        key="data_editor"
+    )
 
-# Show summary
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.subheader("Data Summary")
-    st.write(f"Total rows: {len(edited_df)}")
-    st.write(f"Total columns: {len(edited_df.columns)}")
+    # Update session state with edited data
+    st.session_state.df = edited_df
 
-with col2:
-    st.subheader("Column Info")
-    for col in edited_df.columns:
-        non_null = edited_df[col].notna().sum()
-        st.write(f"{col}: {non_null}/{len(edited_df)} filled")
 
-with col3:
-    st.subheader("Actions")
-    
-    # Add empty column button
-    if st.button("➕ Add Empty Column"):
-        new_col_name = f"New_Column_{len(edited_df.columns) + 1}"
-        st.session_state.df[new_col_name] = ''
-        st.rerun()
-    
-    # Download button
-    if st.button("Download as Excel"):
-        buffer = BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            edited_df.to_excel(writer, index=False, sheet_name='Data')
-        
-        st.download_button(
-            label="📥 Download Excel File",
-            data=buffer.getvalue(),
-            file_name="edited_data.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+df_runner(man_df)
