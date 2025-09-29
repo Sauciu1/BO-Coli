@@ -52,32 +52,42 @@ mode = 'multicore'
 
 
 
-def run_grid(save_path ):
-    n_runs = 80
+def run_grid(save_path):
+    n_runs = 100
     mp.set_start_method("spawn", force=True)  # Windows-safe
 
     t0 = time.perf_counter()
     print("Starting batch Bayesian optimization tests...")
 
-    #param_grid = [(tr, float(n)) for tr in range(1, 9, 2) for n in np.linspace(0, 1.1, 6)]
     param_grid = [(tr, n, f"again_{again}") for tr in range(1, 10, 2) for n in np.linspace(0, 1.1, 6) for again in range(1, 7)]
-    n_workers = 64 #min(len(param_grid), int(os.cpu_count()*0.8) or 1)
+    n_workers = 64
 
-
-    with mp.get_context("spawn").Pool(processes=n_workers) as pool:
-        results = pool.starmap(_single_run, [(el[0:2], n_runs) for el in param_grid])
-
-    r_n_dict = dict(zip(param_grid, results))
-
+    # Create results dict and ensure directory exists
+    r_n_dict = {}
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path))
-        
-    with open(save_path, 'wb') as f:
-        pickle.dump(r_n_dict, f)
 
-    elapsed = time.perf_counter() - t0
-    print(f"Completed {len(param_grid)} configs in {elapsed:.2f}s with {n_workers} workers")
-    r_n_dict
+    # Callback function to save after each completion
+    def save_result(result, param_key):
+        r_n_dict[param_key] = result
+        with open(save_path, 'wb') as f:
+            pickle.dump(r_n_dict, f)
+        print(f"Saved result for {param_key} - Total completed: {len(r_n_dict)}/{len(param_grid)}")
+
+    with mp.get_context("spawn").Pool(processes=n_workers) as pool:
+        # Submit all jobs and collect AsyncResult objects
+        jobs = []
+        for param in param_grid:
+            job = pool.apply_async(_single_run, args=(param[0:2], n_runs))
+            jobs.append((job, param))
+        
+        # Collect results as they complete
+        for job, param_key in jobs:
+            result = job.get()  # This blocks until the specific job completes
+            save_result(result, param_key)
+
+    t1 = time.perf_counter()
+    print(f"All tasks completed in {t1 - t0:.2f} seconds.")
 
 
 if __name__ == "__main__":

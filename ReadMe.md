@@ -21,6 +21,4 @@ conda install pip
 pip install poetry
 poetry install --no-root
 poetry run python h6_simulations.py
-
-
 ```y
