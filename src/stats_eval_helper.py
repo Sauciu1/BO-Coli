@@ -29,11 +29,17 @@ def hit_stats(hit_df):
             "Recall": sdiv(wd["TP"], wd["TP"] + wd["FN"]),
             "Specificity": sdiv(wd["TN"], wd["TN"] + wd["FP"]),
             "Accuracy": sdiv(wd["TP"] + wd["TN"], total),
+   
         }
+        wd = wd |{
+            "F1": sdiv(2 * wd["Precision"] * wd["Recall"], wd["Precision"] + wd["Recall"]),
+ 
+        }
+
         output_dict[id] = wd
 
 
         df= pd.DataFrame(output_dict).T
-        df.index = df.index.set_names(['tech_repeats', 'noise'])
+        df.reset_index(inplace=True, drop=False)
 
     return df

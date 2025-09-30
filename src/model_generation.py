@@ -55,6 +55,8 @@ class HeteroNoiseSGP(SingleTaskGP):
 
 class HeteroWhiteSGP(HeteroNoiseSGP):
     def __init__(self, train_X, train_Y, quintile=0.05, **kwargs) -> None:
+        if train_X.unique(dim=0).size(0) == train_X.size(0):
+            raise ValueError("All training points are unique, no heteroscedasticity estimates possible")
         
         std_unique, std_all = self._calc_std(train_X, train_Y)
         p10 = torch.quantile(std_unique, quintile)
