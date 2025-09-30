@@ -7,15 +7,6 @@ from io import BytesIO
 from ax import Client
 import ax_helper
 
-toy_df = pd.DataFrame({
-    'ID': [1, 2, 3, 4, 5],
-    'Name': ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'],
-    'Age': [25, 30, 35, 28, 32],
-    'Department': ['Engineering', 'Marketing', 'Sales', 'HR', 'Engineering'],
-    'Salary': [70000, 65000, 60000, 55000, 75000],
-    'Comments': ['', '', '', '', '']  # Empty last column
-})
-
 
 class BayesDFManager():
     def __init__(self, df:pd.DataFrame, input_cols:list[str], response_col:list[str]):
@@ -69,6 +60,11 @@ class BayesDFManager():
 
 
         return self.df
+    
+    @property
+    def obs(self):
+        return self.df[self.input_cols + self.response_col]
+
 
 
     @staticmethod
@@ -108,7 +104,6 @@ uploaded_file = st.file_uploader(
     help="Upload a .json file to load Bayesian optimization data."
 )
 
-  
 
 
 def df_runner(man_df):
@@ -126,4 +121,20 @@ def df_runner(man_df):
     st.session_state.df = edited_df
 
 
+
+
+
+
 df_runner(man_df)
+
+
+
+from GPVisualiser import GPVisualiser
+from model_generation import HeteroWhiteSGP
+
+def show_gp_visualisation():
+    if st.button("Show GP Visualisation"):
+        gp = HeteroWhiteSGP
+        visualiser = GPVisualiser(gp, man_df.obs, man_df.input_cols, man_df.response_col)
+        fig, axs = visualiser.plot_all()
+        st.pyplot(fig)

@@ -1,5 +1,5 @@
-from .NNarySearch import NNarySearch
-from . import distribution_functions
+from src.NNarySearch import NNarySearch
+from src import distribution_functions
 import pandas as pd
 
 def run_simulations(center_space, power_space, split_space) -> pd.DataFrame:

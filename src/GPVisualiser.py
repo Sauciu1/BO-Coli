@@ -15,7 +15,7 @@ import seaborn as sns
 from ax import RangeParameterConfig
 from sklearn.preprocessing import FunctionTransformer
 
-from .ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
+from ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
 
 
 
@@ -337,6 +337,9 @@ class GPVisualiserMatplotlib(GPVisualiser):
 
         ax.set_title(f"GP along {dim_name}")
         ax.legend().set_visible(False)
+
+    def return_fig(self):
+        return self.fig
 
 
 if __name__ == "__main__":
