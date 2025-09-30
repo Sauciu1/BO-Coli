@@ -1,0 +1,313 @@
+Channels:
+ - conda-forge
+Platform: linux-64
+Collecting package metadata (repodata.json): ...working... done
+Solving environment: ...working... done
+
+# All requested packages already installed.
+
+Requirement already satisfied: poetry in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (2.2.1)
+Requirement already satisfied: build<2.0.0,>=1.2.1 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (1.3.0)
+Requirement already satisfied: cachecontrol<0.15.0,>=0.14.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cachecontrol[filecache]<0.15.0,>=0.14.0->poetry) (0.14.3)
+Requirement already satisfied: cleo<3.0.0,>=2.1.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (2.1.0)
+Requirement already satisfied: dulwich<0.25.0,>=0.24.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (0.24.2)
+Requirement already satisfied: fastjsonschema<3.0.0,>=2.18.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (2.21.2)
+Requirement already satisfied: findpython<0.8.0,>=0.6.2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (0.7.0)
+Requirement already satisfied: installer<0.8.0,>=0.7.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (0.7.0)
+Requirement already satisfied: keyring<26.0.0,>=25.1.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (25.6.0)
+Requirement already satisfied: packaging>=24.2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (25.0)
+Requirement already satisfied: pbs-installer<2026.0.0,>=2025.1.6 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (2025.9.18)
+Requirement already satisfied: pkginfo<2.0,>=1.12 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (1.12.1.2)
+Requirement already satisfied: platformdirs<5,>=3.0.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (4.3.8)
+Requirement already satisfied: poetry-core==2.2.1 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (2.2.1)
+Requirement already satisfied: pyproject-hooks<2.0.0,>=1.0.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (1.2.0)
+Requirement already satisfied: requests<3.0,>=2.26 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (2.32.5)
+Requirement already satisfied: requests-toolbelt<2.0.0,>=1.0.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (1.0.0)
+Requirement already satisfied: shellingham<2.0,>=1.5 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (1.5.4)
+Requirement already satisfied: tomlkit<1.0.0,>=0.11.4 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (0.13.3)
+Requirement already satisfied: trove-classifiers>=2022.5.19 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (2025.9.11.17)
+Requirement already satisfied: virtualenv>=20.26.6 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from poetry) (20.34.0)
+Requirement already satisfied: msgpack<2.0.0,>=0.5.2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cachecontrol<0.15.0,>=0.14.0->cachecontrol[filecache]<0.15.0,>=0.14.0->poetry) (1.1.1)
+Requirement already satisfied: filelock>=3.8.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cachecontrol[filecache]<0.15.0,>=0.14.0->poetry) (3.18.0)
+Requirement already satisfied: crashtest<0.5.0,>=0.4.1 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cleo<3.0.0,>=2.1.0->poetry) (0.4.1)
+Requirement already satisfied: rapidfuzz<4.0.0,>=3.0.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cleo<3.0.0,>=2.1.0->poetry) (3.14.1)
+Requirement already satisfied: urllib3>=2.2.2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from dulwich<0.25.0,>=0.24.0->poetry) (2.5.0)
+Requirement already satisfied: SecretStorage>=3.2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from keyring<26.0.0,>=25.1.0->poetry) (3.4.0)
+Requirement already satisfied: jeepney>=0.4.2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from keyring<26.0.0,>=25.1.0->poetry) (0.9.0)
+Requirement already satisfied: jaraco.classes in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from keyring<26.0.0,>=25.1.0->poetry) (3.4.0)
+Requirement already satisfied: jaraco.functools in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from keyring<26.0.0,>=25.1.0->poetry) (4.3.0)
+Requirement already satisfied: jaraco.context in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from keyring<26.0.0,>=25.1.0->poetry) (6.0.1)
+Requirement already satisfied: httpx<1,>=0.27.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (0.28.1)
+Requirement already satisfied: zstandard>=0.21.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (0.25.0)
+Requirement already satisfied: anyio in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from httpx<1,>=0.27.0->pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (4.11.0)
+Requirement already satisfied: certifi in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from httpx<1,>=0.27.0->pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (2025.8.3)
+Requirement already satisfied: httpcore==1.* in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from httpx<1,>=0.27.0->pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (1.0.9)
+Requirement already satisfied: idna in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from httpx<1,>=0.27.0->pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (3.10)
+Requirement already satisfied: h11>=0.16 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from httpcore==1.*->httpx<1,>=0.27.0->pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (0.16.0)
+Requirement already satisfied: charset_normalizer<4,>=2 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from requests<3.0,>=2.26->poetry) (3.4.3)
+Requirement already satisfied: cryptography>=2.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from SecretStorage>=3.2->keyring<26.0.0,>=25.1.0->poetry) (46.0.1)
+Requirement already satisfied: cffi>=2.0.0 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cryptography>=2.0->SecretStorage>=3.2->keyring<26.0.0,>=25.1.0->poetry) (2.0.0)
+Requirement already satisfied: pycparser in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from cffi>=2.0.0->cryptography>=2.0->SecretStorage>=3.2->keyring<26.0.0,>=25.1.0->poetry) (2.23)
+Requirement already satisfied: distlib<1,>=0.3.7 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from virtualenv>=20.26.6->poetry) (0.4.0)
+Requirement already satisfied: sniffio>=1.1 in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from anyio->httpx<1,>=0.27.0->pbs-installer[download,install]<2026.0.0,>=2025.1.6->poetry) (1.3.1)
+Requirement already satisfied: more-itertools in /rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages (from jaraco.classes->keyring<26.0.0,>=25.1.0->poetry) (10.8.0)
+Resolving dependencies...
+Installing dependencies from lock file
+
+No dependencies to install or update
+__main__
+Starting batch Bayesian optimization tests...
+Saved result for (1, np.float64(0.0), 'again_1') - Total completed: 1/180
+Saved result for (1, np.float64(0.0), 'again_2') - Total completed: 2/180
+Saved result for (1, np.float64(0.0), 'again_3') - Total completed: 3/180
+Saved result for (1, np.float64(0.0), 'again_4') - Total completed: 4/180
+Saved result for (1, np.float64(0.0), 'again_5') - Total completed: 5/180
+Saved result for (1, np.float64(0.0), 'again_6') - Total completed: 6/180
+Saved result for (1, np.float64(0.22000000000000003), 'again_1') - Total completed: 7/180
+Saved result for (1, np.float64(0.22000000000000003), 'again_2') - Total completed: 8/180
+Saved result for (1, np.float64(0.22000000000000003), 'again_3') - Total completed: 9/180
+Saved result for (1, np.float64(0.22000000000000003), 'again_4') - Total completed: 10/180
+Saved result for (1, np.float64(0.22000000000000003), 'again_5') - Total completed: 11/180
+Saved result for (1, np.float64(0.22000000000000003), 'again_6') - Total completed: 12/180
+Saved result for (1, np.float64(0.44000000000000006), 'again_1') - Total completed: 13/180
+Saved result for (1, np.float64(0.44000000000000006), 'again_2') - Total completed: 14/180
+Saved result for (1, np.float64(0.44000000000000006), 'again_3') - Total completed: 15/180
+Saved result for (1, np.float64(0.44000000000000006), 'again_4') - Total completed: 16/180
+Saved result for (1, np.float64(0.44000000000000006), 'again_5') - Total completed: 17/180
+Saved result for (1, np.float64(0.44000000000000006), 'again_6') - Total completed: 18/180
+Saved result for (1, np.float64(0.6600000000000001), 'again_1') - Total completed: 19/180
+Saved result for (1, np.float64(0.6600000000000001), 'again_2') - Total completed: 20/180
+Saved result for (1, np.float64(0.6600000000000001), 'again_3') - Total completed: 21/180
+Saved result for (1, np.float64(0.6600000000000001), 'again_4') - Total completed: 22/180
+Saved result for (1, np.float64(0.6600000000000001), 'again_5') - Total completed: 23/180
+Saved result for (1, np.float64(0.6600000000000001), 'again_6') - Total completed: 24/180
+Saved result for (1, np.float64(0.8800000000000001), 'again_1') - Total completed: 25/180
+Saved result for (1, np.float64(0.8800000000000001), 'again_2') - Total completed: 26/180
+Saved result for (1, np.float64(0.8800000000000001), 'again_3') - Total completed: 27/180
+Saved result for (1, np.float64(0.8800000000000001), 'again_4') - Total completed: 28/180
+Saved result for (1, np.float64(0.8800000000000001), 'again_5') - Total completed: 29/180
+Saved result for (1, np.float64(0.8800000000000001), 'again_6') - Total completed: 30/180
+Saved result for (1, np.float64(1.1), 'again_1') - Total completed: 31/180
+Saved result for (1, np.float64(1.1), 'again_2') - Total completed: 32/180
+Saved result for (1, np.float64(1.1), 'again_3') - Total completed: 33/180
+Saved result for (1, np.float64(1.1), 'again_4') - Total completed: 34/180
+Saved result for (1, np.float64(1.1), 'again_5') - Total completed: 35/180
+Saved result for (1, np.float64(1.1), 'again_6') - Total completed: 36/180
+Saved result for (3, np.float64(0.0), 'again_1') - Total completed: 37/180
+Saved result for (3, np.float64(0.0), 'again_2') - Total completed: 38/180
+Saved result for (3, np.float64(0.0), 'again_3') - Total completed: 39/180
+Saved result for (3, np.float64(0.0), 'again_4') - Total completed: 40/180
+Saved result for (3, np.float64(0.0), 'again_5') - Total completed: 41/180
+Saved result for (3, np.float64(0.0), 'again_6') - Total completed: 42/180
+Saved result for (3, np.float64(0.22000000000000003), 'again_1') - Total completed: 43/180
+Saved result for (3, np.float64(0.22000000000000003), 'again_2') - Total completed: 44/180
+Saved result for (3, np.float64(0.22000000000000003), 'again_3') - Total completed: 45/180
+Saved result for (3, np.float64(0.22000000000000003), 'again_4') - Total completed: 46/180
+Saved result for (3, np.float64(0.22000000000000003), 'again_5') - Total completed: 47/180
+Saved result for (3, np.float64(0.22000000000000003), 'again_6') - Total completed: 48/180
+Saved result for (3, np.float64(0.44000000000000006), 'again_1') - Total completed: 49/180
+Saved result for (3, np.float64(0.44000000000000006), 'again_2') - Total completed: 50/180
+Saved result for (3, np.float64(0.44000000000000006), 'again_3') - Total completed: 51/180
+Saved result for (3, np.float64(0.44000000000000006), 'again_4') - Total completed: 52/180
+Saved result for (3, np.float64(0.44000000000000006), 'again_5') - Total completed: 53/180
+Saved result for (3, np.float64(0.44000000000000006), 'again_6') - Total completed: 54/180
+Saved result for (3, np.float64(0.6600000000000001), 'again_1') - Total completed: 55/180
+Saved result for (3, np.float64(0.6600000000000001), 'again_2') - Total completed: 56/180
+Saved result for (3, np.float64(0.6600000000000001), 'again_3') - Total completed: 57/180
+Saved result for (3, np.float64(0.6600000000000001), 'again_4') - Total completed: 58/180
+Saved result for (3, np.float64(0.6600000000000001), 'again_5') - Total completed: 59/180
+Saved result for (3, np.float64(0.6600000000000001), 'again_6') - Total completed: 60/180
+Saved result for (3, np.float64(0.8800000000000001), 'again_1') - Total completed: 61/180
+Saved result for (3, np.float64(0.8800000000000001), 'again_2') - Total completed: 62/180
+Saved result for (3, np.float64(0.8800000000000001), 'again_3') - Total completed: 63/180
+Saved result for (3, np.float64(0.8800000000000001), 'again_4') - Total completed: 64/180
+Saved result for (3, np.float64(0.8800000000000001), 'again_5') - Total completed: 65/180
+Saved result for (3, np.float64(0.8800000000000001), 'again_6') - Total completed: 66/180
+Saved result for (3, np.float64(1.1), 'again_1') - Total completed: 67/180
+Saved result for (3, np.float64(1.1), 'again_2') - Total completed: 68/180
+Saved result for (3, np.float64(1.1), 'again_3') - Total completed: 69/180
+Saved result for (3, np.float64(1.1), 'again_4') - Total completed: 70/180
+Saved result for (3, np.float64(1.1), 'again_5') - Total completed: 71/180
+Saved result for (3, np.float64(1.1), 'again_6') - Total completed: 72/180
+Saved result for (5, np.float64(0.0), 'again_1') - Total completed: 73/180
+Saved result for (5, np.float64(0.0), 'again_2') - Total completed: 74/180
+Saved result for (5, np.float64(0.0), 'again_3') - Total completed: 75/180
+Saved result for (5, np.float64(0.0), 'again_4') - Total completed: 76/180
+Saved result for (5, np.float64(0.0), 'again_5') - Total completed: 77/180
+Saved result for (5, np.float64(0.0), 'again_6') - Total completed: 78/180
+Saved result for (5, np.float64(0.22000000000000003), 'again_1') - Total completed: 79/180
+Saved result for (5, np.float64(0.22000000000000003), 'again_2') - Total completed: 80/180
+Saved result for (5, np.float64(0.22000000000000003), 'again_3') - Total completed: 81/180
+Saved result for (5, np.float64(0.22000000000000003), 'again_4') - Total completed: 82/180
+Saved result for (5, np.float64(0.22000000000000003), 'again_5') - Total completed: 83/180
+Saved result for (5, np.float64(0.22000000000000003), 'again_6') - Total completed: 84/180
+Saved result for (5, np.float64(0.44000000000000006), 'again_1') - Total completed: 85/180
+Saved result for (5, np.float64(0.44000000000000006), 'again_2') - Total completed: 86/180
+Saved result for (5, np.float64(0.44000000000000006), 'again_3') - Total completed: 87/180
+Saved result for (5, np.float64(0.44000000000000006), 'again_4') - Total completed: 88/180
+Saved result for (5, np.float64(0.44000000000000006), 'again_5') - Total completed: 89/180
+Saved result for (5, np.float64(0.44000000000000006), 'again_6') - Total completed: 90/180
+Saved result for (5, np.float64(0.6600000000000001), 'again_1') - Total completed: 91/180
+Saved result for (5, np.float64(0.6600000000000001), 'again_2') - Total completed: 92/180
+Saved result for (5, np.float64(0.6600000000000001), 'again_3') - Total completed: 93/180
+Saved result for (5, np.float64(0.6600000000000001), 'again_4') - Total completed: 94/180
+Saved result for (5, np.float64(0.6600000000000001), 'again_5') - Total completed: 95/180
+Saved result for (5, np.float64(0.6600000000000001), 'again_6') - Total completed: 96/180__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+__mp_main__
+
+Saved result for (5, np.float64(0.8800000000000001), 'again_1') - Total completed: 97/180
+Saved result for (5, np.float64(0.8800000000000001), 'again_2') - Total completed: 98/180
+Saved result for (5, np.float64(0.8800000000000001), 'again_3') - Total completed: 99/180
+Saved result for (5, np.float64(0.8800000000000001), 'again_4') - Total completed: 100/180
+Saved result for (5, np.float64(0.8800000000000001), 'again_5') - Total completed: 101/180
+Saved result for (5, np.float64(0.8800000000000001), 'again_6') - Total completed: 102/180
+Saved result for (5, np.float64(1.1), 'again_1') - Total completed: 103/180
+Saved result for (5, np.float64(1.1), 'again_2') - Total completed: 104/180
+Saved result for (5, np.float64(1.1), 'again_3') - Total completed: 105/180
+Saved result for (5, np.float64(1.1), 'again_4') - Total completed: 106/180
+Saved result for (5, np.float64(1.1), 'again_5') - Total completed: 107/180
+Saved result for (5, np.float64(1.1), 'again_6') - Total completed: 108/180
+Saved result for (7, np.float64(0.0), 'again_1') - Total completed: 109/180
+Saved result for (7, np.float64(0.0), 'again_2') - Total completed: 110/180
+Saved result for (7, np.float64(0.0), 'again_3') - Total completed: 111/180
+Saved result for (7, np.float64(0.0), 'again_4') - Total completed: 112/180
+Saved result for (7, np.float64(0.0), 'again_5') - Total completed: 113/180
+Saved result for (7, np.float64(0.0), 'again_6') - Total completed: 114/180
+Saved result for (7, np.float64(0.22000000000000003), 'again_1') - Total completed: 115/180
+Saved result for (7, np.float64(0.22000000000000003), 'again_2') - Total completed: 116/180
+Saved result for (7, np.float64(0.22000000000000003), 'again_3') - Total completed: 117/180
+Saved result for (7, np.float64(0.22000000000000003), 'again_4') - Total completed: 118/180
+Saved result for (7, np.float64(0.22000000000000003), 'again_5') - Total completed: 119/180
+Saved result for (7, np.float64(0.22000000000000003), 'again_6') - Total completed: 120/180
+Saved result for (7, np.float64(0.44000000000000006), 'again_1') - Total completed: 121/180
+Saved result for (7, np.float64(0.44000000000000006), 'again_2') - Total completed: 122/180
+Saved result for (7, np.float64(0.44000000000000006), 'again_3') - Total completed: 123/180
+Saved result for (7, np.float64(0.44000000000000006), 'again_4') - Total completed: 124/180
+Saved result for (7, np.float64(0.44000000000000006), 'again_5') - Total completed: 125/180
+Saved result for (7, np.float64(0.44000000000000006), 'again_6') - Total completed: 126/180
+Saved result for (7, np.float64(0.6600000000000001), 'again_1') - Total completed: 127/180
+Saved result for (7, np.float64(0.6600000000000001), 'again_2') - Total completed: 128/180
+Saved result for (7, np.float64(0.6600000000000001), 'again_3') - Total completed: 129/180
+Saved result for (7, np.float64(0.6600000000000001), 'again_4') - Total completed: 130/180
+Saved result for (7, np.float64(0.6600000000000001), 'again_5') - Total completed: 131/180
+Saved result for (7, np.float64(0.6600000000000001), 'again_6') - Total completed: 132/180
+Saved result for (7, np.float64(0.8800000000000001), 'again_1') - Total completed: 133/180
+Saved result for (7, np.float64(0.8800000000000001), 'again_2') - Total completed: 134/180
+Saved result for (7, np.float64(0.8800000000000001), 'again_3') - Total completed: 135/180
+Saved result for (7, np.float64(0.8800000000000001), 'again_4') - Total completed: 136/180
+Saved result for (7, np.float64(0.8800000000000001), 'again_5') - Total completed: 137/180
+Saved result for (7, np.float64(0.8800000000000001), 'again_6') - Total completed: 138/180
+Saved result for (7, np.float64(1.1), 'again_1') - Total completed: 139/180
+Saved result for (7, np.float64(1.1), 'again_2') - Total completed: 140/180
+Saved result for (7, np.float64(1.1), 'again_3') - Total completed: 141/180
+Saved result for (7, np.float64(1.1), 'again_4') - Total completed: 142/180
+Saved result for (7, np.float64(1.1), 'again_5') - Total completed: 143/180
+Saved result for (7, np.float64(1.1), 'again_6') - Total completed: 144/180
+Saved result for (9, np.float64(0.0), 'again_1') - Total completed: 145/180
+Saved result for (9, np.float64(0.0), 'again_2') - Total completed: 146/180
+Saved result for (9, np.float64(0.0), 'again_3') - Total completed: 147/180
+Saved result for (9, np.float64(0.0), 'again_4') - Total completed: 148/180
+Saved result for (9, np.float64(0.0), 'again_5') - Total completed: 149/180
+Saved result for (9, np.float64(0.0), 'again_6') - Total completed: 150/180
+Saved result for (9, np.float64(0.22000000000000003), 'again_1') - Total completed: 151/180
+Saved result for (9, np.float64(0.22000000000000003), 'again_2') - Total completed: 152/180
+Saved result for (9, np.float64(0.22000000000000003), 'again_3') - Total completed: 153/180
+Saved result for (9, np.float64(0.22000000000000003), 'again_4') - Total completed: 154/180
+Saved result for (9, np.float64(0.22000000000000003), 'again_5') - Total completed: 155/180
+Saved result for (9, np.float64(0.22000000000000003), 'again_6') - Total completed: 156/180
+Saved result for (9, np.float64(0.44000000000000006), 'again_1') - Total completed: 157/180
+Saved result for (9, np.float64(0.44000000000000006), 'again_2') - Total completed: 158/180
+Saved result for (9, np.float64(0.44000000000000006), 'again_3') - Total completed: 159/180
+Saved result for (9, np.float64(0.44000000000000006), 'again_4') - Total completed: 160/180
+Saved result for (9, np.float64(0.44000000000000006), 'again_5') - Total completed: 161/180
+Saved result for (9, np.float64(0.44000000000000006), 'again_6') - Total completed: 162/180
+Saved result for (9, np.float64(0.6600000000000001), 'again_1') - Total completed: 163/180
+Saved result for (9, np.float64(0.6600000000000001), 'again_2') - Total completed: 164/180
+Saved result for (9, np.float64(0.6600000000000001), 'again_3') - Total completed: 165/180
+Saved result for (9, np.float64(0.6600000000000001), 'again_4') - Total completed: 166/180
+Saved result for (9, np.float64(0.6600000000000001), 'again_5') - Total completed: 167/180
+Saved result for (9, np.float64(0.6600000000000001), 'again_6') - Total completed: 168/180
+Saved result for (9, np.float64(0.8800000000000001), 'again_1') - Total completed: 169/180
+Saved result for (9, np.float64(0.8800000000000001), 'again_2') - Total completed: 170/180
+Saved result for (9, np.float64(0.8800000000000001), 'again_3') - Total completed: 171/180
+Saved result for (9, np.float64(0.8800000000000001), 'again_4') - Total completed: 172/180
+Saved result for (9, np.float64(0.8800000000000001), 'again_5') - Total completed: 173/180
+Saved result for (9, np.float64(0.8800000000000001), 'again_6') - Total completed: 174/180
+Saved result for (9, np.float64(1.1), 'again_1') - Total completed: 175/180
+Saved result for (9, np.float64(1.1), 'again_2') - Total completed: 176/180
+Saved result for (9, np.float64(1.1), 'again_3') - Total completed: 177/180
+Saved result for (9, np.float64(1.1), 'again_4') - Total completed: 178/180
+Saved result for (9, np.float64(1.1), 'again_5') - Total completed: 179/180
+Saved result for (9, np.float64(1.1), 'again_6') - Total completed: 180/180
+All tasks completed in 2097.66 seconds.
+
+====================================
+CPU Time used: 26:52:52
+CPU Percent: 6313%
+Memory usage: 77423100kb
+Approx Power usage: 0.32239999999999996
+Walltime usage: 00:36:39
+
+====================================
