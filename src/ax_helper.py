@@ -142,6 +142,12 @@ def get_train_Xy(
     return train_X, train_Y
 
 
+
+def ax_param_bounds_as_list(parameters:Sequence[RangeParameterConfig]):
+    """returns parameter bounds in simpler to use format"""
+
+    return np.array([p.bounds for p in parameters])
+
 class UnitCubeScaler(BaseEstimator, TransformerMixin):
     """Scale parameters to/from the unit hypercube.
 
@@ -156,15 +162,12 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         # store provided parameters for later use in fit
         self.parameters = ax_parameters
         self.bounds: Optional[np.ndarray] = (
-            self._get_bounds(ax_parameters) if ax_parameters is not None else None
+            self.ax_param_bounds_as_list(ax_parameters) if ax_parameters is not None else None
         )
         self._output_type = "default"
         self.dim_names: Optional[Sequence[str]] = None
 
-    def _get_bounds(self, parameters):
-        if parameters is not None:
-            return np.array([p.bounds for p in parameters])
-        return None
+
 
     def set_output(self, *, transform: Optional[str] = None):  # sklearn >=1.2 style
         """Set output container type.
