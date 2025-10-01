@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from ax import RangeParameterConfig
 from sklearn.preprocessing import FunctionTransformer
-
+import ax_helper
 from ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
 
 
@@ -22,6 +22,7 @@ from ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Default dtype for the visualiser tensors - keep high precision by default
 dtype = torch.float64
+
 
 
 
@@ -388,7 +389,7 @@ if __name__ == "__main__":
 
 
 
-    for i, trial in get_obs_from_client(client, response_col='response').iterrows():
+    for i, trial in get_obs_from_client(client).iterrows():
         if not pd.isna(trial['response']):
             continue
 
@@ -400,7 +401,7 @@ if __name__ == "__main__":
 
     client.get_next_trials(max_trials=6)
 
-    obs = get_obs_from_client(client, response_col='response')
+    obs = get_obs_from_client(client)
     plotter = GPVisualiserMatplotlib(SingleTaskGP, obs, dim_names, 'response', parameters)
     plotter.plot_all(coordinates=torch.tensor([10.0, 10.0]))
     plt.show()

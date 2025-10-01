@@ -1,36 +1,14 @@
 from tkinter import Y
-from typing import Self
+
 from urllib import response
 import pandas as pd
 import streamlit as st
 from io import BytesIO
 from ax import Client
 import ax_helper
+from ax_helper import BayesClientManager
 
-
-class BayesClientManager():
-    def __init__(self, client):
-        self.client = client
-        self.df:pd.DataFrame = ax_helper.get_obs_from_client(client)
-        self.input_cols: list[str] = list(client._experiment.parameters.keys())
-        self.response_col: str = str(list(client._experiment.metrics.keys())[0])
-
-    @staticmethod
-    def load_from_json(json_path: str) -> Self:
-        client = Client().load_from_json_file(json_path)
-
-        
-        return BayesClientManager(client)
-
-    @property   
-    def X(self) -> pd.DataFrame:
-        return self.df[self.input_cols]
-
-    @property
-    def y(self) -> pd.Series:
-        return self.df[self.response_col]
-    
-
+class stBayesClientManager(BayesClientManager):
     def get_column_config(self) -> dict:
         config = {}
 
@@ -52,39 +30,9 @@ class BayesClientManager():
         return config
     
 
-    def get_batch_instance_repeat(self, ):
-        positions = self.X
-
-        trial_instance = self.df.loc[:, 'trial_name'].str.split('_').map(lambda x: x[0])
-        
-        trial_dict = {trial:i for i, trial in enumerate(trial_instance.unique())}
-
-        self.df['Group'] = trial_instance.map(trial_dict).astype(int)
-        self.unique_trials = trial_dict
-        return self.df
-    
-    @property
-    def obs(self):
-        return self.df[self.input_cols + [self.response_col]]
-
-
-
-
-    
-    def get_best_coordinates(self) -> dict:
-        best_row = self.df.loc[self.df[self.response_col].idxmax()]
-        return best_row[self.input_cols].to_dict()
-    
-    def get_parameter_ranges(self) -> dict:
-        from ax_helper import ax_param_bounds_as_list
-        bounds = list(self.client._experiment.parameters.values())
-        # Convert bounds array to dictionary with parameter names as keys
-        return {param_name: (bounds[i].lower, bounds[i].upper) for i, param_name in enumerate(self.input_cols)}
-    
-
 
 json_path = r"data/ax_clients/hartmann6_runs.json"
-man_df:BayesClientManager =  BayesClientManager.load_from_json(json_path)
+man_df:stBayesClientManager =  stBayesClientManager.load_from_json(json_path)
 print(man_df.get_batch_instance_repeat())
 
 

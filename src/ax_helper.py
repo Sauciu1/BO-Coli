@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor
 from sklearn.base import BaseEstimator, TransformerMixin
-
+from typing import Self
 from ax import Client
 from ax.core import trial
 from ax.api.configs import RangeParameterConfig
@@ -122,6 +122,56 @@ def get_obs_from_client(client: Client) -> pd.DataFrame:
     return obs
 
 
+
+class BayesClientManager():
+    def __init__(self, client):
+        self.client = client
+        self.df:pd.DataFrame = get_obs_from_client(client)
+        self.input_cols: list[str] = list(client._experiment.parameters.keys())
+        self.response_col: str = str(list(client._experiment.metrics.keys())[0])
+
+    @staticmethod
+    def load_from_json(json_path: str) -> Self:
+        client = Client().load_from_json_file(json_path)
+
+        
+        return BayesClientManager(client)
+
+    @property   
+    def X(self) -> pd.DataFrame:
+        return self.df[self.input_cols]
+
+    @property
+    def y(self) -> pd.Series:
+        return self.df[self.response_col]
+    
+    
+
+    def get_batch_instance_repeat(self, ):
+        positions = self.X
+
+        trial_instance = self.df.loc[:, 'trial_name'].str.split('_').map(lambda x: x[0])
+        
+        trial_dict = {trial:i for i, trial in enumerate(trial_instance.unique())}
+
+        self.df['Group'] = trial_instance.map(trial_dict).astype(int)
+        self.unique_trials = trial_dict
+        return self.df
+    
+    @property
+    def obs(self):
+        return self.df[self.input_cols + [self.response_col]]
+
+    def get_best_coordinates(self) -> dict:
+        best_row = self.df.loc[self.df[self.response_col].idxmax()]
+        return best_row[self.input_cols].to_dict()
+    
+    def get_parameter_ranges(self) -> dict:
+        bounds = list(self.client._experiment.parameters.values())
+        # Convert bounds array to dictionary with parameter names as keys
+        return {param_name: (bounds[i].lower, bounds[i].upper) for i, param_name in enumerate(self.input_cols)}
+
+
 def get_train_Xy(
     trial_df: pd.DataFrame, dim_cols: Sequence[str], response_col: str = "response"
 ) -> Tuple[Tensor, Tensor]:
@@ -162,7 +212,7 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         # store provided parameters for later use in fit
         self.parameters = ax_parameters
         self.bounds: Optional[np.ndarray] = (
-            self.ax_param_bounds_as_list(ax_parameters) if ax_parameters is not None else None
+            ax_param_bounds_as_list(ax_parameters) if ax_parameters is not None else None
         )
         self._output_type = "default"
         self.dim_names: Optional[Sequence[str]] = None
