@@ -31,9 +31,9 @@ class stBayesClientManager(BayesClientManager):
 
         
     @classmethod
-    def load_from_json(cls, json_path):
+    def init_from_json(cls, json_path):
         """Override to return stBayesClientManager instance"""
-        temp_manager = super().load_from_json(json_path)
+        temp_manager = super().init_from_json(json_path)
         instance = cls(temp_manager.client, temp_manager.input_cols, temp_manager.response_col)
         instance.df = temp_manager.df
         return instance
@@ -44,7 +44,7 @@ class stBayesClientManager(BayesClientManager):
 
 json_path = r"data/ax_clients/hartmann6_runs.json"
 # Load as BayesClientManager first, then convert to stBayesClientManager
-temp_manager = ax_helper.BayesClientManager.load_from_json(json_path)
+temp_manager = ax_helper.BayesClientManager.init_from_json(json_path)
 man_df = stBayesClientManager(temp_manager.client)
 # Copy over the dataframe
 man_df.df = temp_manager.df

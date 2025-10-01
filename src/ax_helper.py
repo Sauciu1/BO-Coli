@@ -131,10 +131,8 @@ class BayesClientManager():
         self.response_col: str = str(list(client._experiment.metrics.keys())[0])
 
     @staticmethod
-    def load_from_json(json_path: str) -> Self:
+    def init_from_json(json_path: str) -> Self:
         client = Client().load_from_json_file(json_path)
-
-        
         return BayesClientManager(client)
 
     @property   
@@ -144,6 +142,8 @@ class BayesClientManager():
     @property
     def y(self) -> pd.Series:
         return self.df[self.response_col]
+    
+    
     
     
 
@@ -170,6 +170,8 @@ class BayesClientManager():
         bounds = list(self.client._experiment.parameters.values())
         # Convert bounds array to dictionary with parameter names as keys
         return {param_name: (bounds[i].lower, bounds[i].upper) for i, param_name in enumerate(self.input_cols)}
+    
+    
 
 
 def get_train_Xy(
