@@ -4,6 +4,7 @@
 
 from ax import Client
 
+from ax.plot import render
 from ipykernel.pickleutil import istype
 import pandas as pd
 import torch
@@ -16,6 +17,8 @@ from ax import RangeParameterConfig
 from sklearn.preprocessing import FunctionTransformer
 import ax_helper
 from ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 
@@ -350,7 +353,239 @@ class GPVisualiserMatplotlib(GPVisualiser):
 
     def return_fig(self):
         return self.fig
+    
 
+
+class PlotlyAxWrapper:
+    """Wrapper to make Plotly subplots behave like matplotlib axes."""
+    def __init__(self, fig, row, col):
+        self.fig = fig
+        self.row = row
+        self.col = col
+
+class GPVisualiserPlotly(GPVisualiser):
+    def _plot_expected_improvement(self, ax, x, mean, std, sizes):
+        if len(x) == 0:
+            return
+        elif len(x)==1:
+            x, mean, std, sizes = [x.item()], [mean.item()], [std.item()], [sizes.item()]
+        else:
+            # Convert tensors to numpy/python types
+            x = x.cpu().numpy() if hasattr(x, 'cpu') else x.values
+            mean = mean.cpu().numpy() if hasattr(mean, 'cpu') else mean
+            std = std.cpu().numpy() if hasattr(std, 'cpu') else std
+            sizes = sizes.cpu().numpy() if hasattr(sizes, 'cpu') else sizes
+
+        # Plot each predicted point as a separate error bar
+        for xi, mi, si, sz in zip(x, mean, std, sizes):
+            # Error bar line
+            ax.fig.add_trace(
+                go.Scatter(
+                    x=[float(xi), float(xi)],
+                    y=[float(mi - 2 * si), float(mi + 2 * si)],
+                    mode='lines',
+                    line=dict(color='red', width=float(sz * 1 + 0.1)),
+                    opacity=0.3,
+                    showlegend=False,
+                    name='Predicted (selected point)'
+                ),
+                row=ax.row, col=ax.col
+            )
+            
+            # Center point
+            ax.fig.add_trace(
+                go.Scatter(
+                    x=[float(xi)],
+                    y=[float(mi)],
+                    mode='markers',
+                    marker=dict(color='red', size=float(sz * 8 + 3)),
+                    opacity=0.3,
+                    showlegend=False,
+                    name='Predicted (selected point)'
+                ),
+                row=ax.row, col=ax.col
+            )
+
+    @staticmethod
+    def _plot_gp(grid: Tensor, mean: Tensor, std: Tensor, ax, coordinates):
+        """Plot GP mean and confidence intervals along a single dimension."""
+        grid_np = grid.cpu().numpy()
+        mean_np = mean.cpu().numpy()
+        std_np = std.cpu().numpy()
+        
+        # Add confidence interval
+        ax.fig.add_trace(
+            go.Scatter(
+                x=np.concatenate([grid_np, grid_np[::-1]]),
+                y=np.concatenate([mean_np - 2 * std_np, (mean_np + 2 * std_np)[::-1]]),
+                fill='toself',
+                fillcolor='rgba(0,100,80,0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='95% CI',
+                showlegend=False
+            ),
+            row=ax.row, col=ax.col
+        )
+        
+        # Add mean line
+        ax.fig.add_trace(
+            go.Scatter(
+                x=grid_np,
+                y=mean_np,
+                mode='lines',
+                name='GP mean',
+                line=dict(color='blue'),
+                showlegend=False
+            ),
+            row=ax.row, col=ax.col
+        )
+
+    def _vlines(self, ax, coordinates):
+        # Get y-axis range for the subplot
+        y_range = [float(self.obs_y.min() * 0.95), float(self.obs_y.max() * 1.05)]
+        
+        ax.fig.add_trace(
+            go.Scatter(
+                x=[float(coordinates), float(coordinates)],
+                y=y_range,
+                mode='lines',
+                line=dict(color='black', dash='dash', width=2),
+                opacity=0.7,
+                name='Current Dim Value',
+                showlegend=False
+            ),
+            row=ax.row, col=ax.col
+        )
+
+    def _create_subplots(self, figsize=(12, 6)):
+        rows, cols = self.subplot_dims
+        
+        # Create subplot titles
+        subplot_titles = [f"GP along {col}" for col in self.obs_X.columns]
+        
+        fig = make_subplots(
+            rows=rows, 
+            cols=cols,
+            subplot_titles=subplot_titles,
+            vertical_spacing=0.1,
+            horizontal_spacing=0.1
+        )
+        
+        # Create wrapper objects for each subplot
+        axs = []
+        for i in range(self.obs_X.shape[1]):
+            row = (i // cols) + 1
+            col = (i % cols) + 1
+            axs.append(PlotlyAxWrapper(fig, row, col))
+        
+        return fig, axs
+
+    def _add_subplot_elements(self, rounded_coords):
+        # Update layout
+        self.fig.update_layout(
+            title=dict(
+                text=f"GP Along Each Dimension for point {rounded_coords}",
+                x=0.5,
+                xanchor='center'
+            ),
+            height=400 * self.subplot_dims[0],
+            width=600 * self.subplot_dims[1],
+            showlegend=True,
+            legend=dict(
+                x=1.02,
+                y=0.5,
+                xanchor="left",
+                yanchor="middle"
+            )
+        )
+
+        # Add legend by making first occurrence of each trace name visible
+        seen_names = set()
+        for trace in self.fig.data:
+            if trace.name and trace.name not in seen_names:
+                trace.showlegend = True
+                seen_names.add(trace.name)
+
+    def _plot_observations(self, ax, dim_name: str, coordinates):
+        """Plot observed data points along a single dimension."""
+        dim = self.obs_X.columns.get_loc(dim_name)
+        point_size = self._get_size(self.obs_X, coordinates, dim)
+        
+        # Convert tensors to numpy for plotly
+        if hasattr(point_size, 'cpu'):
+            point_size = point_size.cpu().numpy()
+        elif hasattr(point_size, 'numpy'):
+            point_size = point_size.numpy()
+        
+        ax.fig.add_trace(
+            go.Scatter(
+                x=self.obs_X[dim_name].values,
+                y=self.obs_y.values,
+                mode='markers',
+                marker=dict(
+                    size=[float(s * 20 + 5) for s in point_size],
+                    color='orange',
+                    line=dict(width=1, color='black'),
+                    opacity=0.7
+                ),
+                name='Observations',
+                showlegend=False
+            ),
+            row=ax.row, col=ax.col
+        )
+
+    def plot_all(self, coordinates: list[float] | Tensor | pd.Series, linspace=None, figsize=(12, 6)):
+        """Handle plotting all dimensions using Plotly subplots."""
+        
+        if coordinates is None:
+            coordinates = self.get_best_observed_coord()
+
+        # Normalize coordinates into a torch.Tensor
+        if isinstance(coordinates, pd.Series):
+            coordinates = torch.tensor(coordinates.values, dtype=dtype)
+        elif isinstance(coordinates, np.ndarray):
+            coordinates = torch.tensor(coordinates, dtype=dtype)
+
+        self.fig, axs = self._create_subplots(figsize=figsize)
+
+        linspace = self._create_linspace(100) if linspace is None else linspace
+        
+        for i in range(self.obs_X.shape[1]):
+            ax = axs[i]
+
+            if not isinstance(linspace[i], Tensor):
+                grid = torch.tensor(linspace[i], dtype=dtype, device=device)
+            else:
+                grid = linspace[i].detach().clone()
+
+            mean, std = self._get_plane_gaussian_for_point(
+                coordinates, fixed_dim=i, grid=grid
+            )
+
+            self._plot_gp(grid, mean, std, ax, coordinates)
+            dim = self.obs_X.columns[i]
+
+            self._vlines(ax, coordinates[i])
+            self._plot_observations(ax, dim, coordinates)
+            self._add_expected_improvement(ax, dim, coordinates)
+
+        rounded_coords = [f"{x:.3g}" for x in coordinates]
+        self._add_subplot_elements(rounded_coords)
+
+        return self.fig, axs
+
+    def _add_expected_improvement_plotly(self, fig, dim: str, coordinates: Tensor, row, col):
+        mean, std = self._eval_gp(self.predict_X)
+        dim_x = self.predict_X.loc[:, dim]
+        sizes = self._get_size(self.predict_X, coordinates, dim)
+        self._plot_expected_improvement(fig, dim_x, mean, std, sizes, row, col)
+
+    def return_fig(self):
+        return self.fig
+
+    def show(self):
+        """Display the Plotly figure."""
+        self.fig.show()
 
 if __name__ == "__main__":
     from toy_functions import ResponseFunction
@@ -402,7 +637,18 @@ if __name__ == "__main__":
     client.get_next_trials(max_trials=6)
 
     obs = get_obs_from_client(client)
-    plotter = GPVisualiserMatplotlib(SingleTaskGP, obs, dim_names, 'response', parameters)
-    plotter.plot_all(coordinates=torch.tensor([10.0, 10.0]))
-    plt.show()
+    
+    # Test Plotly version
+    plotter_plotly = GPVisualiserPlotly(SingleTaskGP, obs, dim_names, 'response', parameters)
+    fig, _ = plotter_plotly.plot_all(coordinates=torch.tensor([10.0, 10.0]))
+    fig.show(render="browser")
+    import tempfile, webbrowser, plotly.io as pio
+
+    # Explicitly write figure to an ephemeral HTML file and open in default browser
+    _html = pio.to_html(fig, include_plotlyjs="cdn", full_html=True)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as _f:
+        _f.write(_html)
+    webbrowser.open("file://" + _f.name)
+
+
     None

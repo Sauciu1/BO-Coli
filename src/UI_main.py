@@ -9,6 +9,8 @@ import ax_helper
 from ax_helper import BayesClientManager
 
 class stBayesClientManager(BayesClientManager):
+    """Extends BayesClientManager to provide Streamlit-specific functionality"""
+
     def get_column_config(self) -> dict:
         config = {}
 
@@ -25,14 +27,28 @@ class stBayesClientManager(BayesClientManager):
                 config[col] = st.column_config.NumberColumn(format="%d", help="Group of technical repeats")
             else:
                 continue
+        return config
 
         
-        return config
+    @classmethod
+    def load_from_json(cls, json_path):
+        """Override to return stBayesClientManager instance"""
+        temp_manager = super().load_from_json(json_path)
+        instance = cls(temp_manager.client, temp_manager.input_cols, temp_manager.response_col)
+        instance.df = temp_manager.df
+        return instance
+
+
     
 
 
 json_path = r"data/ax_clients/hartmann6_runs.json"
-man_df:stBayesClientManager =  stBayesClientManager.load_from_json(json_path)
+# Load as BayesClientManager first, then convert to stBayesClientManager
+temp_manager = ax_helper.BayesClientManager.load_from_json(json_path)
+man_df = stBayesClientManager(temp_manager.client)
+# Copy over the dataframe
+man_df.df = temp_manager.df
+
 print(man_df.get_batch_instance_repeat())
 
 
@@ -77,7 +93,7 @@ df_runner(man_df)
 
 
 
-from GPVisualiser import GPVisualiserMatplotlib
+from GPVisualiser import GPVisualiserMatplotlib, GPVisualiserPlotly
 from model_generation import HeteroWhiteSGP
 import pandas as pd
 
@@ -85,17 +101,15 @@ def plot_gaussian_process(coords=None):
     st.session_state.show_main = True
     man_df.df = st.session_state.df
     gp = HeteroWhiteSGP
-    visualiser = GPVisualiserMatplotlib(gp, man_df.obs, man_df.input_cols, man_df.response_col)
+    visualiser = GPVisualiserPlotly(gp, man_df.obs, man_df.input_cols, man_df.response_col)
     fig, axs = visualiser.plot_all(coordinates=coords)
-    st.pyplot(fig)
-
-
-
+    st.plotly_chart(fig, use_container_width=True)
 
 def manually_set_coordinates():
     """Allows user to manually set coordinates for plotting the GP"""
+    st.subheader("Plot GP at Specific Coordinates")
     columns = st.columns([0.6,0.4])
-    st.subheader("Manually Set Coordinates")
+   
 
     
         
