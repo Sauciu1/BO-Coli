@@ -8,7 +8,14 @@
             "args": [
                 "run",
                 "${file}"
-            ]
+            ],
+            "justMyCode": true,
+            "stopOnEntry": false,
+            "exceptionHandling": {
+                "ignore": [
+                    "streamlit.runtime.scriptrunner_utils.exceptions.RerunException"
+                ]
+            }
         }
     ]
 }
