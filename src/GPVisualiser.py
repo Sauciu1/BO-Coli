@@ -152,6 +152,11 @@ class GPVisualiser:
         if not isinstance(point2, Tensor):
             point2 = torch.tensor(point2)
         return torch.dist(point1, point2).item()
+    
+    def get_best_observed_coord(self) -> pd.Series:
+        """Get the coordinates of the best observed point."""
+        best_idx = self.obs_y.idxmax()
+        return self.obs_X.loc[best_idx]
 
     def plot_all(
         self, coordinates: list[float] | Tensor | pd.Series, linspace=None, figsize=(12,6)
@@ -164,6 +169,10 @@ class GPVisualiser:
         * self._vlines,
         * self._add_subplot_elements
         """
+
+        if coordinates is None:
+            coordinates = self.get_best_observed_coord()
+            
 
         # Normalize coordinates into a torch.Tensor (avoid torch.tensor(tensor))
         if isinstance(coordinates, pd.Series):
