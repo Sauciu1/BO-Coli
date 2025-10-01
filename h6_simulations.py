@@ -46,15 +46,14 @@ print(__name__)
 mode = 'multicore'
 
 def run_grid(save_path):
-    n_runs = 3
     #param_grid = [(tr, n, f"again_{again}") for tr in range(1, 10, 2) for n in np.linspace(0, 1.1, 6) for again in range(1, 7)]
 
     param_grid = [
         {"technical_repeats":technical_repeats, "noise":noise, "cycles":cycles, "batches":batch}
-        for technical_repeats in [1, 3, 5, 7, 9]
-        for noise in [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5]
-        for batch in [1, 2, 4, 8]
-        for cycles in [100]
+        for technical_repeats in [1, 2, 4, 8]
+        for noise in [3.4* x for x in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]]
+        for batch in [1]
+        for cycles in [80]
         for rerun in range(10)
     ]
     
@@ -97,7 +96,7 @@ def run_grid(save_path):
 
 if __name__ == "__main__":
     save_dir = "data/bayes_sim/"
-    save_PATH = save_dir + 'HeteroWhite_sequential_09_30.pkl'
+    save_PATH = save_dir + 'HeteroWhite_sequential_09_31.pkl'
 
     run_grid(save_PATH)
     # Runtime for sequential runs : 112s
