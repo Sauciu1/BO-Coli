@@ -145,7 +145,8 @@ class Group:
 
 
 class GroupManager:
-    def __init__(self, parameter_labels: list[str]):
+    def __init__(self, parameter_labels: list[str], bayes_manager: BayesClientManager = None):
+        self.bayes_manager = bayes_manager
         self.parameter_labels = parameter_labels
         if "groups" not in st.session_state:
             st.session_state["groups"] = []
@@ -219,7 +220,9 @@ class GroupManager:
             st.caption(f"Showing {len(groups_to_show)} pending groups out of {len(self.groups)} total")
 
         for group in groups_to_show:  # Use filtered list
-            col1, col2 = st.columns([1, 0.05], gap=None)  # Reduce delete button column
+            col0, col1, col2 = st.columns([0.08, 1, 0.05], gap=None)  # Reduce delete button column
+            with col0:
+                st.markdown(f"**{group.label}**")
 
             with col1:
                 group.render()
@@ -249,20 +252,13 @@ class GroupManager:
             if df.empty:
                 st.info("No data available yet.")
             else:
-                stats = (
-                    df.groupby("group_label")["response"]
-                    .agg(["count", "mean", "std"])
-                    .reset_index()
-                    .rename(
-                        columns={
-                            "group_label": "Group",
-                            "count": "N",
-                            "mean": "Mean",
-                            "std": "Std",
-                        }
-                    )
-                )
-                st.dataframe(stats, use_container_width=True)
+                # Filter out NaN values for statistics
+                df_clean = df.dropna()
+                if not df_clean.empty:
+                    stats = self.bayes_manager.get_agg_info()
+                    st.dataframe(stats, use_container_width=True)
+                else:
+                    st.info("No valid data for statistics.")
 
     @staticmethod
     def init_from_df(df: pd.DataFrame, parameter_labels: list[str]):
@@ -300,13 +296,13 @@ class GroupManager:
         return manager
 
     @staticmethod
-    def init_from_manager(manager: BayesClientManager):
+    def init_from_manager(bayes_manager: BayesClientManager):
         """Initialize groups from a BayesClientManager"""
-        df = manager.get_batch_instance_repeat()
-        parameter_labels = manager.input_cols
+        df = bayes_manager.get_batch_instance_repeat()
+        parameter_labels = bayes_manager.input_cols
         group_manager = GroupManager.init_from_df(df, parameter_labels)
+        group_manager.bayes_manager = bayes_manager
         return group_manager
-    
 
     def write_to_manager(self, manager: BayesClientManager):
         """Write all group data to a BayesClientManager"""
@@ -328,33 +324,16 @@ if __name__ == "__main__":
     st.title("Group Manager Test")
     st.set_page_config(layout="wide")
     
-
     # Initialize manager only once using session state
     if "manager" not in st.session_state:
-        test_df = pd.DataFrame(
-            {
-                "x1": [0.1, 0.1, 0.2],
-                "x2": [0.2, 0.3, 0.2],
-                "response": [1.0, 1.5, 2.0],
-                "group": ["A", "A", "B"],
-            }
-        )
-
-        # st.session_state.manager = GroupManager.init_from_df(test_df, ["x1", "x2"])
-
-
         json_path = r"data/ax_clients/hartmann6_runs.json"
-        st.session_state.manager = GroupManager.init_from_manager(
-            BayesClientManager.init_from_json(json_path)
-        )
+        bayes_manager = BayesClientManager.init_from_json(json_path)
+        st.session_state.manager = GroupManager.init_from_manager(bayes_manager)
 
     manager = st.session_state.manager
     
-
     manager.render_add_group_button()
-
     manager.show_full_data()
-
     manager.render_all()
 
     st.write("### Full Data")

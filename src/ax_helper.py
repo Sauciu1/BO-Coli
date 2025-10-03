@@ -126,9 +126,11 @@ def get_obs_from_client(client: Client) -> pd.DataFrame:
 class BayesClientManager():
     def __init__(self, client):
         self.client = client
-        self.df:pd.DataFrame = get_obs_from_client(client)
+        self.df = get_obs_from_client(client)
+        #self.df:pd.DataFrame = self.get_batch_instance_repeat()
         self.input_cols: list[str] = list(client._experiment.parameters.keys())
         self.response_col: str = str(list(client._experiment.metrics.keys())[0])
+        self.group_label = None
 
     @staticmethod
     def init_from_json(json_path: str) -> Self:
@@ -147,7 +149,7 @@ class BayesClientManager():
     
     
 
-    def get_batch_instance_repeat(self, ):
+    def get_batch_instance_repeat(self):
         positions = self.X
 
         trial_instance = self.df.loc[:, 'trial_name'].str.split('_').map(lambda x: x[0])
@@ -156,7 +158,10 @@ class BayesClientManager():
 
         self.df['Group'] = trial_instance.map(trial_dict).astype(int)
         self.unique_trials = trial_dict
+        self.group_label = 'Group'
         return self.df
+    
+
     
     @property
     def obs(self):
@@ -170,6 +175,21 @@ class BayesClientManager():
         bounds = list(self.client._experiment.parameters.values())
         # Convert bounds array to dictionary with parameter names as keys
         return {param_name: (bounds[i].lower, bounds[i].upper) for i, param_name in enumerate(self.input_cols)}
+    
+
+    def get_agg_info(self):
+        agg_df = (self.df.groupby(self.group_label)["response"]
+            .agg(["count", "mean", "std"])
+            .reset_index()
+            .rename(
+                columns={
+                    "group_label": "Group",
+                    "count": "N",
+                    "mean": "Mean",
+                    "std": "Std",
+                }
+            ))
+        return agg_df
     
     
 
