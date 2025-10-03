@@ -139,6 +139,7 @@ class BayesClientManager():
     @staticmethod
     def init_from_json(json_path: str) -> Self:
         client = Client().load_from_json_file(json_path)
+
         return BayesClientManager(client)
 
     @property   

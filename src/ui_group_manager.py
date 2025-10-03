@@ -106,6 +106,8 @@ class Group:
                     placeholder=np.nan,
                     key=f"response_{self.id}_{i}",
                     label_visibility="collapsed",
+                    step=1e-10,
+                    format="%.6e"
                 )
                 updated_responses.append(new_val)
 
@@ -285,8 +287,8 @@ class GroupManager:
                 records.append(record)
         return pd.DataFrame(records)
     
-
-    def get_agg_stats(self):
+    @property
+    def agg_stats(self):
         """Get aggregated statistics of the current data"""
         df = self.get_full_data()
         if df.empty:
@@ -304,8 +306,8 @@ class GroupManager:
     def show_data_stats(self):
         """Show aggregated statistics of the current data"""
         with st.expander("Group Statistics", expanded=False):
-            if self.get_agg_stats() is not None:
-                st.dataframe(self.get_agg_stats(), use_container_width=True)
+            if self.agg_stats is not None:
+                st.dataframe(self.agg_stats, use_container_width=True)
             else:
                 st.info("No valid data for statistics.")
 
