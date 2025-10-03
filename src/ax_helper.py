@@ -30,6 +30,8 @@ from ax.generation_strategy.center_generation_node import CenterGenerationNode
 from ax.generation_strategy.transition_criterion import MinTrials
 from ax.adapter.registry import Generators
 
+from h6_simulations import HeteroWhiteSGP
+
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
@@ -124,10 +126,12 @@ def get_obs_from_client(client: Client) -> pd.DataFrame:
 
 
 class BayesClientManager():
-    def __init__(self, client):
-        self.client = client
-        self.df = get_obs_from_client(client)
-        #self.df:pd.DataFrame = self.get_batch_instance_repeat()
+    def __init__(self, client:Client, gaussian_process=HeteroWhiteSGP, acqf_class=qLogExpectedImprovement):
+        self.client: Client = client
+        self.gaussian_process = gaussian_process
+        self.acqf_class = acqf_class
+
+
         self.input_cols: list[str] = list(client._experiment.parameters.keys())
         self.response_col: str = str(list(client._experiment.metrics.keys())[0])
         self.group_label = None
@@ -145,21 +149,62 @@ class BayesClientManager():
     def y(self) -> pd.Series:
         return self.df[self.response_col]
     
+    @property
+    def df(self):
+        return get_obs_from_client(self.client)
     
+    def get_new_targets_from_client(self, n_groups =1):
+        self.client.get_next_trials(max_trials=n_groups)
+ 
+        return get_obs_from_client(self.client)
     
-    
+    def write_self_to_client(self):
+        """Regenerates the Ax client from the current data in self.df"""
+        
+
+        client = Client()
+        client.configure_experiment(parameters=self.client._experiment.parameters)
+        client.configure_optimization(objective=self.response_col)
+
+        generation_strategy = get_full_strategy(gp=self.gaussian_process, acqf_class=self.acqf_class)
+        client.set_generation_strategy(generation_strategy=generation_strategy)
+
+        df = self.get_batch_instance_repeat().sort_values(by=self.group_label, ascending=True)
+
+        df = df[self.input_cols + [self.response_col]]
+        for i, row in df.iterrows():
+            params = {col: row[col] for col in self.input_cols}
+            if not pd.isna(row[self.response_col]):
+                client.attach_trial(parameters=params, arm_name=row['trial_name'])
+                client.complete_trial(trial_index=i, raw_data={self.response_col: float(row[self.response_col])})
+            else:
+                client.attach_trial(parameters=params, arm_name=row['trial_name'])
+
+
+        self.client = client
+        return self
+
+
 
     def get_batch_instance_repeat(self):
-        positions = self.X
-
-        trial_instance = self.df.loc[:, 'trial_name'].str.split('_').map(lambda x: x[0])
+        """return grouped dataframe"""
+        df = self.df.copy()  # Create a copy to avoid modifying the original
         
-        trial_dict = {trial:i for i, trial in enumerate(trial_instance.unique())}
-
-        self.df['Group'] = trial_instance.map(trial_dict).astype(int)
+        # Check if trial_name column exists
+        if 'trial_name' not in df.columns:
+            # If no trial_name column, create a simple group based on index
+            df['Group'] = 0  # All observations in one group
+            self.group_label = 'Group'
+            self.unique_trials = {0: 0}
+            return df
+        
+        trial_instance = df.loc[:, 'trial_name'].str.split('_').map(lambda x: x[0])
+        trial_dict = {trial: i for i, trial in enumerate(trial_instance.unique())}
+        
+        df['Group'] = trial_instance.map(trial_dict).astype(int)
         self.unique_trials = trial_dict
         self.group_label = 'Group'
-        return self.df
+        return df
     
 
     
@@ -178,12 +223,17 @@ class BayesClientManager():
     
 
     def get_agg_info(self):
-        agg_df = (self.df.groupby(self.group_label)["response"]
+        df = self.get_batch_instance_repeat()
+        if self.group_label is None or self.group_label not in df.columns:
+            # If no group label is set or column doesn't exist, return empty DataFrame
+            return pd.DataFrame(columns=["Group", "N", "Mean", "Std"])
+        
+        agg_df = (df.groupby(self.group_label)[self.response_col]
             .agg(["count", "mean", "std"])
             .reset_index()
             .rename(
                 columns={
-                    "group_label": "Group",
+                    self.group_label: "Group",
                     "count": "N",
                     "mean": "Mean",
                     "std": "Std",
@@ -344,6 +394,9 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         else:
             n = 0
         return np.array([f"x{i}" for i in range(n)], dtype=object)
+    
+
+
 
 
 class BatchClientHandler:
@@ -476,6 +529,7 @@ class SequentialRuns:
 
         if noise_fn is None:
             def noise_fn(x): return x
+        
 
         generation_strategy = get_full_strategy(gp=gp, acqf_class=acqf_class)
         client.set_generation_strategy(generation_strategy=generation_strategy)

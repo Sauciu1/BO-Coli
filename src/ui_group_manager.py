@@ -151,7 +151,7 @@ class GroupManager:
         if "groups" not in st.session_state:
             st.session_state["groups"] = []
         if "show_pending_only" not in st.session_state:
-            st.session_state["show_pending_only"] = False
+            st.session_state["show_pending_only"] = True
 
     @property
     def groups(self) -> list[Group]:
@@ -188,20 +188,31 @@ class GroupManager:
     @st.fragment
     def render_all(self):
         # Filter control buttons at the top
-        col1, col2, col3 = st.columns([1, 1, 4])
-        
-        with col1:
+        cols = st.columns([1, 1, 0.5, 2, 4])
+
+        with cols[0]:
             pending_count = sum(self.has_pending_values(g) for g in self.groups)
             if st.button("Show Pending Only", key="show_pending_btn"):
                 st.session_state["show_pending_only"] = True
                 st.rerun(scope="fragment")
             if pending_count == 0:
                 st.caption("No currently pending groups")
-        
-        with col2:
+
+        with cols[1]:
             if st.button("Show All", key="show_all_btn"):
                 st.session_state["show_pending_only"] = False
                 st.rerun(scope="fragment")
+
+        with cols[3]:
+            st.number_input("Batch Size", min_value=1, value=1, step=1, key="num_new_groups")
+            if st.button("Get New Targets"):
+                self.bayes_manager.get_new_targets_from_client(n_groups=st.session_state["num_new_groups"])
+                
+                st.rerun(scope="fragment")
+
+
+                
+
 
         # Column headers
         cols = st.columns([1, 1])  # Make observations column wider
@@ -246,7 +257,8 @@ class GroupManager:
         return pd.DataFrame(records)
 
     @st.fragment
-    def show_full_data(self):
+    def show_data_stats(self):
+        """Show aggregated statistics of the current data"""
         with st.expander("Group Statistics", expanded=False):
             df = self.get_full_data()
             if df.empty:
@@ -294,6 +306,11 @@ class GroupManager:
             manager.add_group(new_group)
 
         return manager
+    
+
+    def get_targets_from_client(self):
+        """Get target values from the BayesClientManager"""
+
 
     @staticmethod
     def init_from_manager(bayes_manager: BayesClientManager):
@@ -333,8 +350,9 @@ if __name__ == "__main__":
     manager = st.session_state.manager
     
     manager.render_add_group_button()
-    manager.show_full_data()
+    
     manager.render_all()
+    manager.show_data_stats()
 
     st.write("### Full Data")
     st.dataframe(manager.get_full_data(), use_container_width=True)
