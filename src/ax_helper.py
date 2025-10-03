@@ -30,7 +30,7 @@ from ax.generation_strategy.center_generation_node import CenterGenerationNode
 from ax.generation_strategy.transition_criterion import MinTrials
 from ax.adapter.registry import Generators
 
-from model_generation import HeteroWhiteSGP
+from src.model_generation import HeteroWhiteSGP
 
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -234,6 +234,8 @@ class BayesClientManager():
         return self.df[self.input_cols + [self.response_col]]
 
     def get_best_coordinates(self) -> dict:
+        if self.df.empty:
+            return None
         best_row = self.df.loc[self.df[self.response_col].idxmax()]
         return best_row[self.input_cols].to_dict()
     
@@ -448,8 +450,7 @@ class BatchClientHandler:
     def complete_all_pending(self):
         """Complete all pending trials by evaluating the response function."""
         for i, trial in get_obs_from_client(
-            self.client, response_col=self.response_col
-        ).iterrows():
+            self.client).iterrows():
             if not pd.isna(trial[self.response_col]):
                 continue
 
@@ -466,7 +467,7 @@ class BatchClientHandler:
 
     def get_batch_observations(self):
         """Return a DataFrame of all trials with observed responses."""
-        obs =  get_obs_from_client(self.client, response_col=self.response_col)
+        obs =  get_obs_from_client(self.client)
         obs['trial_index'] = obs['trial_name'].apply(lambda x: x.split('_')[0]).astype(int)
         #del obs['trial_name']
         return obs

@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import uuid
 import time
-from ax_helper import BayesClientManager
+from src.ax_helper import BayesClientManager
 import numpy as np
 
 
@@ -147,9 +147,9 @@ class Group:
 
 
 class GroupManager:
-    def __init__(self, parameter_labels: list[str], bayes_manager: BayesClientManager = None):
-        self.bayes_manager = bayes_manager
-        self.parameter_labels = parameter_labels
+    def __init__(self, bayes_manager: BayesClientManager):
+
+        self.parameter_labels = bayes_manager.input_cols
         if "groups" not in st.session_state:
             st.session_state["groups"] = []
         if "show_pending_only" not in st.session_state:
@@ -312,7 +312,7 @@ class GroupManager:
                 st.info("No valid data for statistics.")
 
     @staticmethod
-    def init_from_df(df: pd.DataFrame, parameter_labels: list[str]):
+    def init_from_df(df: pd.DataFrame, parameter_labels: list[str], response_col):
         """Initialize groups from a DataFrame with columns x1, x2, ..., response"""
         manager = GroupManager(parameter_labels)
 
@@ -330,7 +330,7 @@ class GroupManager:
             else:
                 X = list(params)
 
-            responses = group_df["response"].tolist()
+            responses = group_df[response_col].tolist()
 
             label = (
                 group_df["group"].iloc[0]
@@ -347,14 +347,20 @@ class GroupManager:
         return manager
     
 
-    def reload_from_manager(self):
+    @staticmethod
+    def reload_from_manager(bayes_manager):
         """Reload all groups from the current BayesClientManager state"""
         # Clear existing groups
         st.session_state["groups"] = []
         
+        # Create a new GroupManager instance
+        parameter_labels = bayes_manager.input_cols
+        group_manager = GroupManager(bayes_manager)
+        group_manager.bayes_manager = bayes_manager
+        
         # Reload from the manager
-        df = self.bayes_manager.get_batch_instance_repeat()
-        param_columns = [col for col in self.parameter_labels if col in df.columns]
+        df = bayes_manager.get_batch_instance_repeat()
+        param_columns = [col for col in parameter_labels if col in df.columns]
         if not param_columns:
             return
         
@@ -366,13 +372,15 @@ class GroupManager:
             else:
                 X = list(params)
 
-            responses = group_df[self.bayes_manager.response_col].tolist()
+            responses = group_df[bayes_manager.response_col].tolist()
             
-            label = f"Group {len(self.groups) + 1}"
+            label = f"Group {len(group_manager.groups) + 1}"
             new_group = Group(
-                X=X, parameters=self.parameter_labels, label=label, responses=responses
+                X=X, parameters=parameter_labels, label=label, responses=responses
             )
-            self.add_group(new_group)
+            group_manager.add_group(new_group)
+        
+        return group_manager
 
     def get_targets_from_client(self):
         """Get target values from the BayesClientManager"""
@@ -381,10 +389,7 @@ class GroupManager:
     @staticmethod
     def init_from_manager(bayes_manager: BayesClientManager):
         """Initialize groups from a BayesClientManager"""
-        df = bayes_manager.get_batch_instance_repeat()
-        parameter_labels = bayes_manager.input_cols
-        group_manager = GroupManager.init_from_df(df, parameter_labels)
-        group_manager.bayes_manager = bayes_manager
+        group_manager = GroupManager.reload_from_manager(bayes_manager)
         return group_manager
 
     def write_to_manager(self, manager: BayesClientManager):

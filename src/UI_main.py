@@ -1,32 +1,29 @@
+from email.headerregistry import Group
 import streamlit as st
 
-from ui_start_new_experiment import new_experiment
-from ax_helper import BayesClientManager
-from ui_group_manager import GroupManager
+from src.ui_start_new_experiment import new_experiment
+from src.ax_helper import BayesClientManager
+from src.ui_group_manager import GroupManager
 import pickle
 import json
-from ui_plotter import BayesPlotter
+from src.ui_plotter import BayesPlotter
 
 
-class main_manager():
+class ExperimentInitialiser():
     def __init__(self):
         pass
-
-    @property
-    def bayes_manager(self):
-        if "bayes_manager" in st.session_state:
-            return st.session_state.bayes_manager
-        return None
-
-
-    def main_loop(self):
-        if not st.session_state.get("experiment_created", False):
-            self._init_or_load_exp()
-        else:
-           self.run_group_manager()
-
-
     def _init_or_load_exp(self):
+        # Check if we're in the middle of creating a new experiment
+        if st.session_state.get("initializing_experiment", False):
+            self._init_experiment()
+            return
+            
+        # Check if we're in the middle of loading an experiment
+        if st.session_state.get("loading_experiment", False):
+            self._load_experiment()
+            return
+            
+        # Show the main menu if we're not in either flow
         st.title("Bayesian Optimization Experiment Manager")
         st.write("Initialize a new experiment or load an existing one.")
 
@@ -35,32 +32,12 @@ class main_manager():
 
  
         if st.button("Initialize New Experiment"):
-            self._init_experiment()
+            st.session_state.initializing_experiment = True
+            st.rerun()
 
         if st.button("Load Existing Experiment"):
-            self._load_experiment()
-
-        if st.button("Finish Setup and Start Experiment", type="primary"):
-            if "new_exp" not in st.session_state:
-                exp = st.session_state.new_exp
-                if all(getattr(exp, attr) is not None for attr in ['client', 'gp', 'acquisition_function']):
-                    manager = BayesClientManager(exp.client, exp.gp, exp.acquisition_function)
-                    st.session_state.bayes_manager = manager
-                    st.session_state.experiment_created = True
-            elif self.bayes_manager is not None:
-                    st.session_state.experiment_created = True
-
-
-###########
-            else:
-                st.error("Please complete the experiment configuration before proceeding.")
-            
-            if "client" in st.session_state and st.session_state.client is not None:
-                st.success("✅ Experiment configuration created!")
-                st.rerun()
-
-        else:
-            st.info("👆 Please create your experiment configuration first by clicking 'Create Experiment' above.")
+            st.session_state.loading_experiment = True
+            st.rerun()
 
 
     @st.fragment
@@ -96,6 +73,8 @@ class main_manager():
                 
                 # Set the experiment as created/completed
                 st.session_state.experiment_created = True
+                # Clear the loading flag
+                st.session_state.loading_experiment = False
                 st.success("✅ Experiment file loaded successfully!")
                 st.rerun()
                 
@@ -105,14 +84,13 @@ class main_manager():
             st.info("Awaiting file upload...")
 
     def _init_experiment(self):
-        # Check if experiment was already successfully created
+    # Check if experiment was already successfully created
         if "experiment_created" in st.session_state and st.session_state.experiment_created:
             # Show only SUCCESS button
             st.title("🎉 EXPERIMENT CREATED SUCCESSFULLY!")
             if st.button("SUCCESS", type="primary", use_container_width=True):
                 st.balloons()
                 st.rerun()
-
             return
         
         if "new_exp" not in st.session_state:
@@ -120,20 +98,61 @@ class main_manager():
         
         exp = st.session_state.new_exp
         exp.create_experiment()
+        
+        # Check if experiment configuration is complete (client exists)
+        if st.session_state.get("client") is not None:
+            st.divider()
+            st.success("✅ Experiment configuration created!")
+            if st.button("Finish Setup and Start Experiment", type="primary", use_container_width=True):
+                manager = BayesClientManager(st.session_state.client, exp.gp, exp.acquisition_function)
+                st.session_state.bayes_manager = manager
+                st.session_state.experiment_created = True
+                # Clear the initializing flag
+                st.session_state.initializing_experiment = False
+                st.rerun()
+
+
+
+class main_manager():
+    def __init__(self):
+        self.loader = ExperimentInitialiser()
+
+    @property
+    def bayes_manager(self):
+        return st.session_state.bayes_manager
+  
+
+
+    def main_loop(self):
+        if not st.session_state.get("experiment_created", False):
+            self.loader._init_or_load_exp()
+        else:
+           self.run_group_manager()
 
 
     @property
     def group_manager(self)->GroupManager:
-        return st.session_state.get("group_manager", None)
+        return st.session_state.get("group_manager", GroupManager.init_from_manager(self.bayes_manager))
+
         
     def run_group_manager(self):
+        # Add a reset button at the top
+        if st.button("🔄 New Experiment", help="Start a new experiment"):
+            # Clear all experiment-related session state
+            for key in ['bayes_manager', 'experiment_created', 'initializing_experiment', 
+                       'loading_experiment', 'client', 'new_exp', 'experiment_configured', 
+                       'group_manager']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+        
         st.session_state.group_manager = GroupManager.init_from_manager(self.bayes_manager)
         self.group_manager.render_all()
         self.group_manager.show_data_stats()
 
         plotter = BayesPlotter(self.bayes_manager)
-        plotter.plot_group_performance()
-        plotter.choose_plot_coordinates()
+        plotter.main_loop()
+    
        
 
 if __name__ == "__main__":

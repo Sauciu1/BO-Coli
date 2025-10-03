@@ -1,10 +1,10 @@
 from ax.core import parameter
-from ax_helper import BayesClientManager
+from src.ax_helper import BayesClientManager
 import pandas as pd
 import streamlit as st
 import ax
 from ax import Client, RangeParameterConfig
-from model_generation import HeteroWhiteSGP
+from src.model_generation import HeteroWhiteSGP
 from botorch.models import SingleTaskGP
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
@@ -238,16 +238,8 @@ class new_experiment:
             horizontal=True,
         )
 
-        # self.objective_direction = st.session_state.objective_direction
-        st.caption(f"Current setting: {self.objective_direction} the objective.")
-
-        # Call the parameter handler
         self.parameter_handler()
-
-        # Display parameter summary
         params = self.get_parameters()
-
-        
         param_df = pd.DataFrame(params)
 
         # Create experiment button

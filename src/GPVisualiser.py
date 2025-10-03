@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from ax import RangeParameterConfig
 from sklearn.preprocessing import FunctionTransformer
-import ax_helper
-from ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
+import src.ax_helper as ax_helper
+from src.ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -588,7 +588,7 @@ class GPVisualiserPlotly(GPVisualiser):
         self.fig.show()
 
 if __name__ == "__main__":
-    from toy_functions import ResponseFunction
+    from src.toy_functions import ResponseFunction
     from botorch.models import SingleTaskGP
 
 
