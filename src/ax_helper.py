@@ -30,7 +30,7 @@ from ax.generation_strategy.center_generation_node import CenterGenerationNode
 from ax.generation_strategy.transition_criterion import MinTrials
 from ax.adapter.registry import Generators
 
-from h6_simulations import HeteroWhiteSGP
+from model_generation import HeteroWhiteSGP
 
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

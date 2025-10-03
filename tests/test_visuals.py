@@ -1,4 +1,4 @@
-from . import GPVisualiser
+import GPVisualiser
 from toy_functions import ResponseFunction
 import torch
 
