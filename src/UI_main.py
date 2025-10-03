@@ -5,6 +5,7 @@ from ax_helper import BayesClientManager
 from ui_group_manager import GroupManager
 import pickle
 import json
+from ui_plotter import BayesPlotter
 
 
 class main_manager():
@@ -22,7 +23,7 @@ class main_manager():
         if not st.session_state.get("experiment_created", False):
             self._init_or_load_exp()
         else:
-           # self.run_group_manager()
+           self.run_group_manager()
 
 
     def _init_or_load_exp(self):
@@ -123,12 +124,16 @@ class main_manager():
 
     @property
     def group_manager(self)->GroupManager:
-        return st.session_state.get("manager", None)
+        return st.session_state.get("group_manager", None)
         
     def run_group_manager(self):
-        st.session_state.manager = GroupManager.init_from_manager(self.bayes_manager)
-        self.bayes_manager.render_all()
-        self.bayes_manager.show_data_stats()
+        st.session_state.group_manager = GroupManager.init_from_manager(self.bayes_manager)
+        self.group_manager.render_all()
+        self.group_manager.show_data_stats()
+
+        plotter = BayesPlotter(self.bayes_manager)
+        plotter.plot_group_performance()
+        plotter.choose_plot_coordinates()
        
 
 if __name__ == "__main__":

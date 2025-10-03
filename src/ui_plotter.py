@@ -13,7 +13,7 @@ import streamlit as st
 
 
 
-class plot_selector:
+class BayesPlotter:
     def __init__ (self, bayes_manager: BayesClientManager):
         self.bayes_manager = bayes_manager
         self.param_ranges = bayes_manager.get_parameter_ranges()
@@ -54,14 +54,14 @@ class plot_selector:
                        ## format="%.4e",
                         min_value=min(param_ranges[c][0] for c in self.bayes_manager.input_cols),
                         max_value=max(param_ranges[c][1] for c in self.bayes_manager.input_cols),
-                        help="Parameter value (will be clamped to valid range)"
+                        help="Parameter value (will be clamped to valid range)ZW"
                     )
                 },
                 key="manual_coords_editor"
             )
 
         # Clamp values to parameter ranges
-        for param in bayes_manager.input_cols:
+        for param in self.bayes_manager.input_cols:
             if param in st.session_state.manual_coords_df.index:
                 min_val, max_val = param_ranges[param]
                 current_val = st.session_state.manual_coords_df.loc[param, 'value']
@@ -74,17 +74,16 @@ class plot_selector:
             self.plot_gaussian_process(gp_model=HeteroWhiteSGP, coords=coords)
 
 
-    @st.fragment
     def plot_gaussian_process(self, gp_model=HeteroWhiteSGP, coords=None):
         """Plot the Gaussian Process using GPVisualiserPlotly"""
         if self.bayes_manager is None or gp_model is None:
             st.error("Bayesian manager or GP model not provided.")
+            return
 
         plotter = GPVisualiserPlotly(gp=gp_model, obs=self.bayes_manager.obs, dim_cols=self.bayes_manager.input_cols, response_col=self.bayes_manager.response_col)
 
         fig, ax = plotter.plot_all(coordinates=coords)
         st.plotly_chart(fig, use_container_width=True)
-        st.rerun(scope="fragment")
 
 
     def plot_group_performance(self):
@@ -93,8 +92,6 @@ class plot_selector:
 
         # Order groups by median performance (descending)
         df = self.bayes_manager.get_batch_instance_repeat()
-
-        st.write(df)
 
         fig = px.box(
             data_frame=df,
@@ -140,7 +137,7 @@ if __name__ == "__main__":
     
 
 
-        plotter = plot_selector(bayes_manager)
+        plotter = BayesPlotter(bayes_manager)
         plotter.plot_group_performance()
         plotter.choose_plot_coordinates()
         
