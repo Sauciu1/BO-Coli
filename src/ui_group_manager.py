@@ -177,18 +177,25 @@ class GroupManager:
 
     def has_pending_values(self, group: Group) -> bool:
         """Check if a group has any NaN values that might be considered pending"""
+        def is_nan_safe(value):
+            """Safely check if a value is NaN, handling non-numeric types"""
+            try:
+                return pd.isna(value) or (isinstance(value, (int, float)) and np.isnan(value))
+            except (TypeError, ValueError):
+                return isinstance(value, str)  # Treat strings as "pending"
+        
         # Check if any X values are NaN (might indicate pending input)
-        has_nan_x = any(np.isnan(x) for x in group.X)
-        not_number = any(isinstance(x, str) for x in group.X)
-        has_nan_x = has_nan_x or not_number
+        has_nan_x = any(is_nan_safe(x) for x in group.X)
+        
         # Check if any responses are NaN (might indicate pending input)
-        has_nan_response = any(np.isnan(r) for r in group.responses)
+        has_nan_response = any(is_nan_safe(r) for r in group.responses)
+        
         return has_nan_x or has_nan_response
 
     @st.fragment
     def render_all(self):
         # Filter control buttons at the top
-        cols = st.columns([1, 1, 0.5, 2, 4])
+        cols = st.columns([1, 1, 0.5, 1, 2])
 
         with cols[0]:
             pending_count = sum(self.has_pending_values(g) for g in self.groups)
@@ -206,9 +213,31 @@ class GroupManager:
         with cols[3]:
             st.number_input("Batch Size", min_value=1, value=1, step=1, key="num_new_groups")
             if st.button("Get New Targets"):
-                self.bayes_manager.get_new_targets_from_client(n_groups=st.session_state["num_new_groups"])
+                with st.spinner("Generating the new targets... please wait."):
+
+                    # Store current number of trials to know which ones are new
+                    current_trials = len(self.bayes_manager.client._experiment.trials)
+                    
+                    # Get new targets (this adds them to the client)
+                    self.bayes_manager.client.get_next_trials(max_trials=st.session_state["num_new_groups"])
+                    
+                    # Get only the newly added trials
+                    new_trials = self.bayes_manager.client._experiment.trials
+                    for trial_idx in range(current_trials, len(new_trials)):
+                        trial = new_trials[trial_idx]
+                        parameter_values = [trial.arm.parameters[param] for param in self.parameter_labels]
+                        new_group = Group(
+                            X=parameter_values,
+                            parameters=self.parameter_labels,
+                            responses=[np.nan],
+                            label=f"Group {len(self.groups) + 1}",
+                        )
+                        self.add_group(new_group)
                 
-                st.rerun(scope="fragment")
+                    st.rerun(scope='fragment')
+        with cols[4]:
+            st.write("#")
+            self.render_add_group_button()
 
 
                 
@@ -255,22 +284,30 @@ class GroupManager:
                 record["group_label"] = group.label
                 records.append(record)
         return pd.DataFrame(records)
+    
+
+    def get_agg_stats(self):
+        """Get aggregated statistics of the current data"""
+        df = self.get_full_data()
+        if df.empty:
+            return pd.DataFrame()
+        else:
+            # Filter out NaN values for statistics
+            df_clean = df.dropna()
+            if not df_clean.empty:
+                stats = self.bayes_manager.get_agg_info()
+                return stats
+            else:
+                return None
 
     @st.fragment
     def show_data_stats(self):
         """Show aggregated statistics of the current data"""
         with st.expander("Group Statistics", expanded=False):
-            df = self.get_full_data()
-            if df.empty:
-                st.info("No data available yet.")
+            if self.get_agg_stats() is not None:
+                st.dataframe(self.get_agg_stats(), use_container_width=True)
             else:
-                # Filter out NaN values for statistics
-                df_clean = df.dropna()
-                if not df_clean.empty:
-                    stats = self.bayes_manager.get_agg_info()
-                    st.dataframe(stats, use_container_width=True)
-                else:
-                    st.info("No valid data for statistics.")
+                st.info("No valid data for statistics.")
 
     @staticmethod
     def init_from_df(df: pd.DataFrame, parameter_labels: list[str]):
@@ -307,6 +344,33 @@ class GroupManager:
 
         return manager
     
+
+    def reload_from_manager(self):
+        """Reload all groups from the current BayesClientManager state"""
+        # Clear existing groups
+        st.session_state["groups"] = []
+        
+        # Reload from the manager
+        df = self.bayes_manager.get_batch_instance_repeat()
+        param_columns = [col for col in self.parameter_labels if col in df.columns]
+        if not param_columns:
+            return
+        
+        grouped = df.groupby(param_columns)
+        for params, group_df in grouped:
+            # Handle single parameter case where params is not a tuple
+            if len(param_columns) == 1:
+                X = [params]
+            else:
+                X = list(params)
+
+            responses = group_df[self.bayes_manager.response_col].tolist()
+            
+            label = f"Group {len(self.groups) + 1}"
+            new_group = Group(
+                X=X, parameters=self.parameter_labels, label=label, responses=responses
+            )
+            self.add_group(new_group)
 
     def get_targets_from_client(self):
         """Get target values from the BayesClientManager"""
@@ -349,7 +413,7 @@ if __name__ == "__main__":
 
     manager = st.session_state.manager
     
-    manager.render_add_group_button()
+
     
     manager.render_all()
     manager.show_data_stats()

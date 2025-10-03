@@ -161,9 +161,21 @@ class BayesClientManager():
     def write_self_to_client(self):
         """Regenerates the Ax client from the current data in self.df"""
         
+        # Convert existing parameters to RangeParameterConfig format
+        range_parameters = []
+        for name, param in self.client._experiment.parameters.items():
+            # Check if parameter uses log scale
+            is_log_scale = getattr(param, 'log_scale', False)
+            range_param = RangeParameterConfig(
+                name=name,
+                parameter_type="float",
+                bounds=(param.lower, param.upper),
+                scaling="log" if is_log_scale else "linear"
+            )
+            range_parameters.append(range_param)
 
         client = Client()
-        client.configure_experiment(parameters=self.client._experiment.parameters)
+        client.configure_experiment(parameters=range_parameters)
         client.configure_optimization(objective=self.response_col)
 
         generation_strategy = get_full_strategy(gp=self.gaussian_process, acqf_class=self.acqf_class)
@@ -171,14 +183,22 @@ class BayesClientManager():
 
         df = self.get_batch_instance_repeat().sort_values(by=self.group_label, ascending=True)
 
-        df = df[self.input_cols + [self.response_col]]
+        # Include trial_name column if it exists, otherwise create trial names
+        if 'trial_name' in df.columns:
+            df = df[self.input_cols + [self.response_col, 'trial_name']]
+        else:
+            df = df[self.input_cols + [self.response_col]]
+            
         for i, row in df.iterrows():
             params = {col: row[col] for col in self.input_cols}
+            # Use trial_name if available, otherwise generate one
+            trial_name = row.get('trial_name', f'trial_{i}')
+            
             if not pd.isna(row[self.response_col]):
-                client.attach_trial(parameters=params, arm_name=row['trial_name'])
+                client.attach_trial(parameters=params, arm_name=trial_name)
                 client.complete_trial(trial_index=i, raw_data={self.response_col: float(row[self.response_col])})
             else:
-                client.attach_trial(parameters=params, arm_name=row['trial_name'])
+                client.attach_trial(parameters=params, arm_name=trial_name)
 
 
         self.client = client
@@ -226,20 +246,21 @@ class BayesClientManager():
         df = self.get_batch_instance_repeat()
         if self.group_label is None or self.group_label not in df.columns:
             # If no group label is set or column doesn't exist, return empty DataFrame
-            return pd.DataFrame(columns=["Group", "N", "Mean", "Std"])
+            return pd.DataFrame(columns=["Group", "N", "Mean", "Std", *self.input_cols])
         
-        agg_df = (df.groupby(self.group_label)[self.response_col]
-            .agg(["count", "mean", "std"])
-            .reset_index()
-            .rename(
-                columns={
-                    self.group_label: "Group",
-                    "count": "N",
-                    "mean": "Mean",
-                    "std": "Std",
-                }
-            ))
-        return agg_df
+        # Aggregate response stats and carry along (unchanged) input columns.
+        # We assume each technical repeat group has identical parameter values.
+        agg_spec = {self.response_col: ["count", "mean", "std"]}
+        for col in self.input_cols:
+            agg_spec[col] = "first"
+
+        grouped = df.groupby(self.group_label).agg(agg_spec).reset_index()
+
+        # Flatten MultiIndex columns
+        new_cols = ["Group", *self.input_cols, "N observations", "Mean", "Std", ]
+        grouped.columns = new_cols
+
+        return grouped
     
     
 

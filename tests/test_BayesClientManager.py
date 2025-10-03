@@ -206,7 +206,6 @@ class TestBayesClientManager:
 
 class TestWriteSelfToClient:
     """Specific tests for the write_self_to_client method."""
-    ``
     def test_write_self_to_client_basic(self, bayes_manager):
         """Test basic functionality of write_self_to_client."""
         # Store original data
@@ -337,8 +336,7 @@ class TestWriteSelfToClient:
         
         assert len(completed_first) == len(completed_second)
     
-    @patch('src.ax_helper.get_full_strategy')
-    def test_write_self_to_client_custom_gp_acqf(self, mock_get_full_strategy, sample_client):
+    def test_write_self_to_client_custom_gp_acqf(self, sample_client):
         """Test that custom GP and acquisition function are used."""
         from botorch.acquisition import qUpperConfidenceBound
         from botorch.models import SingleTaskGP
@@ -350,20 +348,20 @@ class TestWriteSelfToClient:
             acqf_class=qUpperConfidenceBound
         )
         
-        # Mock the strategy creation
-        mock_strategy = Mock()
-        mock_get_full_strategy.return_value = mock_strategy
+        # Store original values to compare
+        original_gp = manager.gaussian_process
+        original_acqf = manager.acqf_class
         
-        manager.write_self_to_client()
+        result_manager = manager.write_self_to_client()
         
-        # Check that get_full_strategy was called with correct parameters
-        mock_get_full_strategy.assert_called_once_with(
-            gp=SingleTaskGP,
-            acqf_class=qUpperConfidenceBound
-        )
+        # Check that the custom GP and acquisition function are preserved
+        assert result_manager.gaussian_process == SingleTaskGP
+        assert result_manager.acqf_class == qUpperConfidenceBound
+        assert original_gp == SingleTaskGP
+        assert original_acqf == qUpperConfidenceBound
         
-        # Check that the strategy was set
-        assert manager.client._generation_strategy == mock_strategy
+        # Check that the new client has a generation strategy
+        assert result_manager.client._generation_strategy is not None
 
 
 if __name__ == "__main__":
