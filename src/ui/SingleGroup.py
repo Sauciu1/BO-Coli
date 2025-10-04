@@ -58,10 +58,11 @@ class SingleGroup:
 
     @st.fragment
     def render(self):
-        st.markdown(f"### Group {self.group_label}")
-        st.caption(f"{self.trial_count} trial(s)")
 
-        cols = st.columns([1, 2, 0.3])
+
+        st.markdown(f"### Group {self.group_label}")
+
+        cols = st.columns([1.5, 2, 0.05])
 
         with cols[0]:
             st.write("**Parameters:**")
@@ -157,14 +158,6 @@ class SingleGroup:
                 self.remove_trial()
                 st.rerun(scope="fragment")
 
-            # Get Data button for this specific group
-            if st.button(
-                "📊",
-                key=f"get_data_group_{self.group_label}_{hash(str(self.group_df.index.tolist()))}",
-                help="Show group data",
-            ):
-                st.write(f"**Group {self.group_label} Data:**")
-                st.dataframe(self.get_data(), width="stretch")
 
     def get_data(self):
         return self.group_df.copy()

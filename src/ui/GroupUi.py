@@ -1,33 +1,47 @@
 
-
-
+import streamlit as st
+import pandas as pd
+import numpy as np
+import uuid
+from src.BayesClientManager import BayesClientManager
+from src.ui.SingleGroup import SingleGroup
 
 
 class GroupUi:
     def __init__(self, bayes_manager: BayesClientManager):
         self.bayes_manager = bayes_manager
         st.session_state.setdefault("show_pending_only", True)
-        st.session_state.setdefault("data_version", 0)
-
-    @property
-    def groups(self) -> list[Group]:
-        if self.bayes_manager.data.empty: return []
-        unique_groups = sorted(self.bayes_manager.data[self.bayes_manager.group_label].unique())
-        groups = [Group(self, g) for g in unique_groups if not pd.isna(g)]
-        [g.invalidate_cache() for g in groups]
-        return groups
+        st.session_state.setdefault("groups", {})
     
-    def _notify_data_change(self):
-        st.session_state["data_version"] = st.session_state.get("data_version", 0) + 1
-        """TODO explicitly update bayes manager"""
-        [g.invalidate_cache() for g in self.groups]
-
-    def update_bayes_manager_from_self(self):
-        self.bayes_manager.data = self.bayes_manager.data.copy(deep=True).reset_index(drop=True)
+    @property
+    def group_data(self):
+        """Get groups data from bayes manager"""
+        return self.bayes_manager.get_groups()
+    
+    @property
+    def groups(self):
+        """Get or create SingleGroup instances"""
+        current_groups = {}
+        for group_label, group_df in self.group_data.items():
+            if group_label not in st.session_state.groups:
+                st.session_state.groups[group_label] = SingleGroup(
+                    group_df, group_label, self.bayes_manager
+                )
+            current_groups[group_label] = st.session_state.groups[group_label]
         
-
-
-
+        # Clean up removed groups
+        removed_groups = set(st.session_state.groups.keys()) - set(current_groups.keys())
+        for group_label in removed_groups:
+            del st.session_state.groups[group_label]
+        
+        return current_groups
+    
+    @property
+    def pending_groups(self):
+        """Get groups that have pending (NaN) responses"""
+        return {label: group for label, group in self.groups.items() 
+                if not group.group_df[self.bayes_manager.response_label].notna().all()}
+        
 
     def add_manual_group(self):
         if self.bayes_manager.data.empty:
@@ -41,24 +55,64 @@ class GroupUi:
                    self.bayes_manager.id_label: f"manual_{str(uuid.uuid4())[:8]}"}
         
         self.bayes_manager.data = pd.concat([self.bayes_manager.data, pd.DataFrame([new_row])], ignore_index=True)
-        self._notify_data_change()
+   
 
-    def remove_group(self, group_number: int):
+    def remove_group(self, group_label: int):
+        """Remove a group from the data and session state"""
+        # Remove from bayes manager data
         self.bayes_manager.data = self.bayes_manager.data[
-            self.bayes_manager.data[self.bayes_manager.group_label] != group_number].reset_index(drop=True)
-        self._notify_data_change()
+            self.bayes_manager.data[self.bayes_manager.group_label] != group_label].reset_index(drop=True)
+        
+        # Remove from session state
+        if group_label in st.session_state.groups:
+            del st.session_state.groups[group_label]
 
 
     @st.fragment
     def render_all(self):
-        cols = st.columns([1, 1, 1, 2])
+        # Control buttons
+        self._render_controls()
+
+        st.divider()
+        
+        # Determine which groups to show
+        groups_to_show: dict[str, SingleGroup] = self.pending_groups if st.session_state["show_pending_only"] else self.groups
+        
+        if st.session_state["show_pending_only"]:
+            st.caption(f"Showing {len(groups_to_show)} pending of {len(self.groups)} total groups")
+        
+        # Render each group
+        for group_label, group in groups_to_show.items():
+            with st.container():
+                cols = st.columns([0.05, 1])
+                
+                with cols[1]:
+                    group.render()
+                    group.write_data_to_manager()
+                
+                with cols[0]:
+                    st.write("")
+                    st.write("")
+                    if st.button("🗑️", key=f"delete_group_{group_label}", help="Delete group"):
+                        self.remove_group(group_label)
+                        st.rerun(scope="fragment")
+                
+                #st.divider()
+    
+    def _render_controls(self):
+        """Render control buttons"""
+        cols = st.columns([1, 1, 2, 2])
         
         with cols[0]:
             if st.button("Show Pending Only"):
                 st.session_state["show_pending_only"] = True
                 st.rerun(scope="fragment")
-            if (pending_count := sum(g.has_pending for g in self.groups)) == 0:
+            
+            pending_count = len(self.pending_groups)
+            if pending_count == 0:
                 st.caption("No pending groups")
+            else:
+                st.caption(f"{pending_count} pending")
         
         with cols[1]:
             if st.button("Show All"):
@@ -66,66 +120,75 @@ class GroupUi:
                 st.rerun(scope="fragment")
         
         with cols[2]:
-            batch_size = st.number_input("Batch Size", min_value=1, value=1, step=1)
-            if st.button("Get New Targets"):
-                self._notify_data_change()
-                with st.spinner("Generating targets..."):
-                    self.bayes_manager.get_batch_targets(batch_size)
-                st.rerun(scope='fragment')
+            self._get_new_targets()
         
         with cols[3]:
             if st.button("Add Manual Group"):
                 self.add_manual_group()
                 st.rerun()
 
-        groups_to_show = [g for g in self.groups if not st.session_state["show_pending_only"] or g.has_pending]
-        
-        if st.session_state["show_pending_only"]:
-            st.caption(f"Showing {len(groups_to_show)} pending of {len(self.groups)} total groups")
+    def _get_new_targets(self):
+        cols = st.columns([1, 1.7, 0.2])
+        with cols[0]:
+            batch_size = st.number_input("Batch Size", min_value=1, value=1, step=1)
+        with cols[1]:
+            if target_button:= st.button("Get New Targets", disabled=False):
+                with st.spinner("Generating targets..."):
+                    try:
+                        self.bayes_manager.data = self.bayes_manager.get_batch_targets(batch_size)
+                        st.rerun(scope='fragment')
+                    except Exception as e:
+                        st.error(f"The number of targets cannot be generated. The model needs more data or has fully explored the space.")
 
-        for group in groups_to_show:
-            with st.container():
-                col0, col1, col2 = st.columns([0.08, 1, 0.05])
-                
-                with col0:
-                    st.markdown(f"**Group {group.group_number}**")
-                    st.caption(f"{len(group.trials)} trial(s)")
-                
-                with col1: group.render()
-                
-                with col2:
-                    if st.button("🗑️", key=f"delete_group_{group.group_number}", help="Delete group"):
-                        self.remove_group(group.group_number)
-                        st.rerun(scope="fragment")
-                
-                st.divider()
+            
+    
 
-    @st.fragment  
+    @st.fragment
     def show_data_stats(self):
         with st.expander("Data Statistics", expanded=False):
             if not self.bayes_manager.data.empty:
-                st.dataframe(self.bayes_manager.agg_stats, use_container_width=True)
+                st.dataframe(self.bayes_manager.agg_stats, width="stretch")
             else:
                 st.info("No data available.")
+        
+        # Add raw data view similar to SingleGroup
+        with st.expander("Raw Data", expanded=False):
+            if not self.bayes_manager.data.empty:
+                st.dataframe(self.bayes_manager.data, width="stretch")
+            else:
+                st.info("No data available.")
+        
+        # Add get all group data button
+        if st.button("Get All Group Data"):
+            df = self.get_current_data()
+            st.dataframe(df, width="stretch")
+
+    def get_current_data(self):
+        """Get current combined data from all groups"""
+        all_data = pd.DataFrame()
+        for group in self.groups.values():
+            all_data = pd.concat([all_data, group.get_data()], ignore_index=True)
+        return all_data
 
 
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
-    st.title("Group Manager Test")
+    st.title("Group Manager")
     
-    # Initialize test data
-    df = pd.DataFrame({
-        'x1': [0.1, 0.4, 0.5, 0.7, 0.1],
-        'x2': [1.0, 0.9, 0.8, 0.6, 1.0],
-        'response': [0.5, 0.6, 0.55, np.nan, 0.45]
-    })
-    
-    bounds = {
-        'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False},
-        'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
-    }
-    
+    # Initialize session state
     if "bayes_manager" not in st.session_state:
+        # Initialize test data
+        df = pd.DataFrame({
+            'x1': [0.1, 0.4, 0.5, 0.7, 0.1],
+            'x2': [1.0, 0.9, 0.8, 0.6, 1.0],
+            'response': [0.5, 0.6, 0.55, np.nan, 0.45]
+        })
+        
+        bounds = {
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False},
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
+        }
+        
         st.session_state.bayes_manager = BayesClientManager(
             data=df,
             feature_labels=['x1', 'x2'],
@@ -133,6 +196,7 @@ if __name__ == "__main__":
             response_label='response'
         )
     
+    # Create and render GroupUi
     ui = GroupUi(st.session_state.bayes_manager)
     ui.render_all()
     ui.show_data_stats()
