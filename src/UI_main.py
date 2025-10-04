@@ -6,7 +6,7 @@ from src.ax_helper import BayesClientManager
 from src.ui_group_manager import GroupManager
 import pickle
 import json
-from src.ui_plotter import BayesPlotter
+from UiBayesPlotter import UiBayesPlotter
 
 
 class ExperimentInitialiser():
@@ -150,7 +150,7 @@ class main_manager():
         self.group_manager.render_all()
         self.group_manager.show_data_stats()
 
-        plotter = BayesPlotter(self.bayes_manager)
+        plotter = UiBayesPlotter(self.bayes_manager)
         plotter.main_loop()
     
        
