@@ -168,6 +168,7 @@ class GroupUi:
         all_data = pd.DataFrame()
         for group in self.groups.values():
             all_data = pd.concat([all_data, group.get_data()], ignore_index=True)
+            self.bayes_manager.data = all_data
         return all_data
 
 
