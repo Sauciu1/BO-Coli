@@ -220,9 +220,10 @@ class InitExperiment:
                 self.experiment_parameters = params
                 st.session_state.experiment_configured = True
 
-                st.rerun()
-                st.write(self.bayes_manager)
-                st.write("Experiment Created Successfully!")
+                
+                st.success("Experiment configured!")
+
+               # st.rerun()
 
             elif len(params) == 0:
                 st.error("Please add at least one parameter to create an experiment.")
@@ -256,16 +257,15 @@ class InitExperiment:
 
 
 if __name__ == "__main__":
-    st.title("Bayesian Optimization for Biological Systems")
 
     if "manager" not in st.session_state:
         st.set_page_config(
             page_title="Start New Experiment",
-            page_icon="🧪",
+
             layout="wide",
             initial_sidebar_state="collapsed",
         )
-        st.title("🧪 Start New Experiment")
+
         exp = InitExperiment().create_experiment()
 
         

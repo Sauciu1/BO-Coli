@@ -20,13 +20,20 @@ class GroupUi:
     
     @property
     def groups(self):
-        """Get or create SingleGroup instances"""
+        """Get or create SingleGroup instances with proper data synchronization"""
         current_groups = {}
+        
+        # Get fresh data from bayes_manager each time
         for group_label, group_df in self.group_data.items():
             if group_label not in st.session_state.groups:
                 st.session_state.groups[group_label] = SingleGroup(
                     group_df, group_label, self.bayes_manager
                 )
+            else:
+                # Update existing group with fresh data from manager
+                existing_group = st.session_state.groups[group_label]
+                existing_group.group_df = group_df.copy()
+            
             current_groups[group_label] = st.session_state.groups[group_label]
         
         # Clean up removed groups
@@ -41,6 +48,11 @@ class GroupUi:
         """Get groups that have pending (NaN) responses"""
         return {label: group for label, group in self.groups.items() 
                 if not group.group_df[self.bayes_manager.response_label].notna().all()}
+    
+    @property
+    def has_data(self):
+        """Check if there's any data available"""
+        return not self.bayes_manager.data.empty
         
 
     def add_manual_group(self):
@@ -88,6 +100,7 @@ class GroupUi:
                 
                 with cols[1]:
                     group.render()
+                    # Ensure data is synced back to manager after rendering
                     group.write_data_to_manager()
                 
                 with cols[0]:
@@ -97,7 +110,7 @@ class GroupUi:
                         self.remove_group(group_label)
                         st.rerun(scope="fragment")
                 
-                #st.divider()
+                st.divider()
     
     def _render_controls(self):
         """Render control buttons"""
@@ -132,44 +145,68 @@ class GroupUi:
         with cols[0]:
             batch_size = st.number_input("Batch Size", min_value=1, value=1, step=1)
         with cols[1]:
-            if target_button:= st.button("Get New Targets", disabled=False):
+            if target_button := st.button("Get New Targets", disabled=False):
                 with st.spinner("Generating targets..."):
                     try:
-                        self.bayes_manager.data = self.bayes_manager.get_batch_targets(batch_size)
+                        # Get new targets from BayesClientManager
+                        self.bayes_manager.get_batch_targets(batch_size)
+                        # Clear cached groups to force refresh with new data
+                        st.session_state.groups = {}
                         st.rerun(scope='fragment')
                     except Exception as e:
-                        st.error(f"The number of targets cannot be generated. The model needs more data or has fully explored the space.")
+                        st.error(f"Error generating targets: {str(e)}")
+                        st.error("The model needs more data or has fully explored the space.")
 
             
     
 
     @st.fragment
     def show_data_stats(self):
+        """Display data statistics and raw data views"""
+        if not self.has_data:
+            st.info("No data available.")
+            return
+        
         with st.expander("Data Statistics", expanded=False):
-            if not self.bayes_manager.data.empty:
-                st.dataframe(self.bayes_manager.agg_stats, width="stretch")
-            else:
-                st.info("No data available.")
+            try:
+                stats = self.bayes_manager.agg_stats
+                if not stats.empty:
+                    st.dataframe(stats, width="stretch")
+                else:
+                    st.info("No aggregated statistics available.")
+            except Exception as e:
+                st.error(f"Error calculating statistics: {str(e)}")
         
-        # Add raw data view similar to SingleGroup
         with st.expander("Raw Data", expanded=False):
-            if not self.bayes_manager.data.empty:
-                st.dataframe(self.bayes_manager.data, width="stretch")
-            else:
-                st.info("No data available.")
+            st.dataframe(self.bayes_manager.data, width="stretch")
         
-        # Add get all group data button
-        if st.button("Get All Group Data"):
-            df = self.get_current_data()
-            st.dataframe(df, width="stretch")
+        # Data export and analysis buttons
+        cols = st.columns([1, 1, 1])
+        
+        with cols[0]:
+            if st.button("Get All Group Data"):
+                st.write("### Current Data from All Groups:")
+                df = self.get_current_data()
+                st.dataframe(df, width="stretch")
+        
+        with cols[1]:
+            if st.button("Sync All Groups"):
+                self.sync_all_groups_to_manager()
+                st.success("All groups synchronized to manager")
+        
+        with cols[2]:
+            if self.bayes_manager.has_response:
+                pending_count = len(self.bayes_manager.pending_targets)
+                st.metric("Pending Trials", pending_count)
 
     def get_current_data(self):
-        """Get current combined data from all groups"""
-        all_data = pd.DataFrame()
+        """Get current data from BayesClientManager (source of truth)"""
+        return self.bayes_manager.data.copy()
+    
+    def sync_all_groups_to_manager(self):
+        """Synchronize all group changes back to the BayesClientManager"""
         for group in self.groups.values():
-            all_data = pd.concat([all_data, group.get_data()], ignore_index=True)
-            self.bayes_manager.data = all_data
-        return all_data
+            group.write_data_to_manager()
 
 
 if __name__ == "__main__":
@@ -196,6 +233,8 @@ if __name__ == "__main__":
             bounds=bounds,
             response_label='response'
         )
+
+
     
     # Create and render GroupUi
     ui = GroupUi(st.session_state.bayes_manager)

@@ -1,11 +1,11 @@
 import pandas as pd
 import uuid
 from botorch.models import SingleTaskGP
-from botorch.acquisition import qLogExpectedImprovement
+from botorch.acquisition import qLogExpectedImprovement, qExpectedImprovement 
 from ax import Client
 from src import ax_helper
 import numpy as np
-
+from src.model_generation import HeteroWhiteSGP
 
 class BayesClientManager:
 
@@ -30,9 +30,9 @@ class BayesClientManager:
 
         self._objective_direction = "maximise"  # or "minimise"
 
-    acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement}
+    acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement, "qExpectedImprovement": qExpectedImprovement}
 
-    gp_options = {"SingleTaskGP": SingleTaskGP}
+    gp_options = {"SingleTaskGP": SingleTaskGP, "HeteroWhiteSGP": HeteroWhiteSGP}
 
     @property
     def objective_direction(self):
@@ -293,10 +293,6 @@ class BayesClientManager:
             bounds=bounds,
         )
 
-        """TODO: Set GP and acquisition function from client"""
-        # manager.gp = client.generation_strategy._model
-        # acqf_class = client.generation_strategy._acquisition_function_class
-        # manager.acquisition_function = [name for name, func in BayesClientManager.acquisition_function_dict.items() if func == acqf_class][0]
         return manager
 
     def get_batch_targets(self, n_targets: int):
@@ -310,8 +306,6 @@ class BayesClientManager:
         # Get the updated data from client
         new_data = self.retrieve_data_from_client(client)
         
-        # Preserve existing response values by merging with stored responses
-        # Keep responses from existing_responses where they exist and are not NaN
         for idx, row in new_data.iterrows():
             row_id = row[self.id_label]
             existing_row = existing_responses[existing_responses[self.id_label] == row_id]
@@ -421,3 +415,9 @@ def example_manager():
         bounds=bounds,
     )
     return manager
+
+
+if __name__ == "__main__":
+    manger = example_manager()
+    import pickle
+    pickle.dump(manger, open("data/example_manager.pkl", "wb"))

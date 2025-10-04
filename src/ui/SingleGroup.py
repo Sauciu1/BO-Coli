@@ -191,9 +191,7 @@ if __name__ == "__main__":
         st.session_state.groups[group_label].write_data_to_manager()
         st.divider()
 
-    # Data views
-    with st.expander("Raw Data", expanded=False):
-        st.dataframe(st.session_state.bayes_manager.data, width="stretch")
+
 
     if st.button("Get All Group Data"):
         for group_label, group in st.session_state.groups.items():
