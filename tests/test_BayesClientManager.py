@@ -3,367 +3,633 @@ import numpy as np
 import pandas as pd
 import tempfile
 import os
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 from ax import Client, RangeParameterConfig
 from ax.core.trial import Trial
 from ax.core.arm import Arm
+from botorch.models import SingleTaskGP
+from botorch.acquisition import qLogExpectedImprovement
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from ax_helper import BayesClientManager, get_obs_from_client
-
-
-@pytest.fixture
-def sample_range_parameters():
-    """Create sample range parameters for testing."""
-    return [
-        RangeParameterConfig(name="x1", parameter_type="float", bounds=(0.0, 1.0)),
-        RangeParameterConfig(name="x2", parameter_type="float", bounds=(-1.0, 1.0)),
-        RangeParameterConfig(name="x3", parameter_type="float", bounds=(0.0, 10.0)),
-    ]
-
-
-@pytest.fixture
-def sample_client(sample_range_parameters):
-    """Create a sample client with some trial data."""
-    client = Client()
-    client.configure_experiment(
-        name="test_experiment",
-        parameters=sample_range_parameters
-    )
-    client.configure_optimization(objective="response")  # Separate configuration step
-    
-    # Add some trial data
-    trial_params = [
-        {"x1": 0.1, "x2": -0.5, "x3": 2.0},
-        {"x1": 0.8, "x2": 0.3, "x3": 7.5},
-        {"x1": 0.5, "x2": 0.0, "x3": 5.0},
-    ]
-    
-    responses = [0.75, 0.45, 0.85]
-    
-    for i, (params, response) in enumerate(zip(trial_params, responses)):
-        client.attach_trial(parameters=params)
-        client.complete_trial(trial_index=i, raw_data={"response": response})
-    
-    return client
-
-
-@pytest.fixture
-def bayes_manager(sample_client):
-    """Create a BayesClientManager with sample data."""
-    return BayesClientManager(sample_client)
+from src.BayesClientManager import BayesClientManager
 
 
 class TestBayesClientManager:
-    """Test suite for BayesClientManager class."""
+    """Test suite for BayesClientManager class"""
     
-    def test_init(self, sample_client):
-        """Test BayesClientManager initialization."""
-        manager = BayesClientManager(sample_client)
-        
-        assert manager.client == sample_client
-        assert manager.gaussian_process is not None  # Should have a default GP
-        assert manager.input_cols == ["x1", "x2", "x3"]
-        assert manager.response_col == "response"
-        assert manager.group_label is None
+    @pytest.fixture
+    def sample_data(self):
+        """Sample data for testing"""
+        return pd.DataFrame({
+            'x1': [0.1, 0.4, 0.5, 0.7, 0.1],
+            'x2': [1.0, 0.9, 0.8, 0.6, 1.0],
+            'y': [0.5, 0.6, 0.55, np.nan, 0.45]
+        })
     
-    def test_init_from_json(self):
-        """Test initialization from JSON file."""
-        # Use the existing JSON file from the data directory instead of creating a new one
-        json_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'ax_clients', 'hartmann6_runs.json')
-        
-        if os.path.exists(json_path):
-            manager = BayesClientManager.init_from_json(json_path)
-            assert isinstance(manager, BayesClientManager)
-            assert len(manager.df) > 0  # Should have some data
-            assert len(manager.input_cols) > 0  # Should have input columns
-            assert manager.response_col is not None  # Should have response column
-        else:
-            # Skip test if data file doesn't exist
-            pytest.skip(f"Test data file not found: {json_path}")
+    @pytest.fixture
+    def feature_labels(self):
+        """Feature labels for testing"""
+        return ['x1', 'x2']
     
-    def test_properties(self, bayes_manager):
-        """Test X, y, and df properties."""
-        df = bayes_manager.df
-        assert isinstance(df, pd.DataFrame)
-        assert len(df) == 3
-        assert all(col in df.columns for col in ["x1", "x2", "x3", "response"])
-        
-        X = bayes_manager.X
-        assert isinstance(X, pd.DataFrame)
-        assert list(X.columns) == ["x1", "x2", "x3"]
-        assert len(X) == 3
-        
-        y = bayes_manager.y
-        assert isinstance(y, pd.Series)
-        assert y.name == "response"
-        assert len(y) == 3
+    @pytest.fixture
+    def response_label(self):
+        """Response label for testing"""
+        return 'y'
     
-    def test_get_new_targets_from_client(self, bayes_manager):
-        """Test getting new targets from client."""
-        initial_df = bayes_manager.df
-        initial_count = len(initial_df)
-        
-        # Get new targets
-        new_df = bayes_manager.get_new_targets_from_client(n_groups=2)
-        
-        # Should have more trials now
-        assert len(new_df) >= initial_count
-        # New targets should have NaN responses initially
-        new_rows = new_df.iloc[initial_count:]
-        if len(new_rows) > 0:
-            assert new_rows["response"].isna().all()
+    @pytest.fixture
+    def bounds(self):
+        """Bounds for testing"""
+        return {'x1': (0.0, 1.0, False), 'x2': (0.5, 1.5, True)}
     
-    def test_get_batch_instance_repeat_with_trial_names(self, bayes_manager):
-        """Test get_batch_instance_repeat with trial names."""
-        df = bayes_manager.get_batch_instance_repeat()
-        
-        assert isinstance(df, pd.DataFrame)
-        assert "Group" in df.columns
-        assert bayes_manager.group_label == "Group"
-        assert hasattr(bayes_manager, "unique_trials")
-        
-        # Groups should be integer values
-        assert df["Group"].dtype == int
-    
-    def test_get_batch_instance_repeat_without_trial_names(self, sample_range_parameters):
-        """Test get_batch_instance_repeat when trial_name column is missing."""
-        # Create client without any trials (so no trial_name column will exist)
-        client = Client()
-        client.configure_experiment(
-            name="no_trial_names",
-            parameters=sample_range_parameters
+    @pytest.fixture
+    def manager(self, sample_data, feature_labels, response_label, bounds):
+        """BayesClientManager instance for testing"""
+        return BayesClientManager(
+            data=sample_data, 
+            feature_labels=feature_labels, 
+            response_label=response_label, 
+            bounds=bounds
         )
-        client.configure_optimization(objective="response")
-        
-        manager = BayesClientManager(client)
-        
-        # This should handle the case where no trial_name column exists
-        result_df = manager.get_batch_instance_repeat()
-        
-        assert "Group" in result_df.columns
-        assert manager.group_label == "Group"
-        # Since there are no trials, the dataframe should be empty or have default grouping
-        if not result_df.empty:
-            assert (result_df["Group"] == 0).all()  # All in one group
-    
-    def test_get_best_coordinates(self, bayes_manager):
-        """Test getting best coordinates."""
-        best_coords = bayes_manager.get_best_coordinates()
-        
-        assert isinstance(best_coords, dict)
-        assert set(best_coords.keys()) == {"x1", "x2", "x3"}
-        
-        # Should correspond to the trial with highest response
-        df = bayes_manager.df
-        best_idx = df["response"].idxmax()
-        expected_coords = df.loc[best_idx, ["x1", "x2", "x3"]].to_dict()
-        
-        assert best_coords == expected_coords
-    
-    def test_get_parameter_ranges(self, bayes_manager):
-        """Test getting parameter ranges."""
-        ranges = bayes_manager.get_parameter_ranges()
-        
-        assert isinstance(ranges, dict)
-        assert set(ranges.keys()) == {"x1", "x2", "x3"}
-        assert ranges["x1"] == (0.0, 1.0)
-        assert ranges["x2"] == (-1.0, 1.0)
-        assert ranges["x3"] == (0.0, 10.0)
-    
-    def test_get_agg_info(self, bayes_manager):
-        """Test getting aggregated information."""
-        # First call get_batch_instance_repeat to set up groups
-        bayes_manager.get_batch_instance_repeat()
-        
-        agg_info = bayes_manager.get_agg_info()
-        
-        assert isinstance(agg_info, pd.DataFrame)
-        assert set(agg_info.columns) == {"Group", "N", "Mean", "Std"}
-        assert len(agg_info) > 0
-    
-    def test_get_agg_info_no_group_label(self, sample_range_parameters):
-        """Test get_agg_info when no group label is set."""
-        client = Client()
-        client.configure_experiment(
-            name="no_groups",
-            parameters=sample_range_parameters
-        )
-        client.configure_optimization(objective="response")
-        
-        manager = BayesClientManager(client)
-        agg_info = manager.get_agg_info()
-        
-        # Should return empty DataFrame with correct columns
-        assert isinstance(agg_info, pd.DataFrame)
-        assert list(agg_info.columns) == ["Group", "N", "Mean", "Std"]
-        assert len(agg_info) == 0
 
-
-class TestWriteSelfToClient:
-    """Specific tests for the write_self_to_client method."""
-    def test_write_self_to_client_basic(self, bayes_manager):
-        """Test basic functionality of write_self_to_client."""
-        # Store original data
-        original_df = bayes_manager.df.copy()
-        original_params = list(bayes_manager.client._experiment.parameters.keys())
-        original_response_col = bayes_manager.response_col
-        
-        # Call write_self_to_client
-        result_manager = bayes_manager.write_self_to_client()
-        
-        # Should return self
-        assert result_manager == bayes_manager
-        
-        # New client should be different object but have same data
-        assert bayes_manager.client is not None
-        
-        # Check that parameter structure is preserved
-        new_params = list(bayes_manager.client._experiment.parameters.keys())
-        assert new_params == original_params
-        
-        # Check that response column is preserved
-        assert bayes_manager.response_col == original_response_col
-        
-        # Check that data is preserved (allowing for small numerical differences)
-        new_df = bayes_manager.df
-        assert len(new_df) >= len(original_df)  # Might have more due to regeneration
-        
-        # Check that completed trials have response data
-        completed_trials = new_df.dropna(subset=[bayes_manager.response_col])
-        assert len(completed_trials) > 0
-    
-    def test_write_self_to_client_preserves_completed_trials(self, bayes_manager):
-        """Test that completed trials are properly preserved."""
-        # Get original completed trials
-        original_df = bayes_manager.get_batch_instance_repeat()
-        completed_original = original_df.dropna(subset=[bayes_manager.response_col])
-        
-        # Call write_self_to_client
-        bayes_manager.write_self_to_client()
-        
-        # Get new data
-        new_df = bayes_manager.get_batch_instance_repeat()
-        completed_new = new_df.dropna(subset=[bayes_manager.response_col])
-        
-        # Should have at least the same number of completed trials
-        assert len(completed_new) >= len(completed_original)
-        
-        # Check that response values are preserved (approximately)
-        original_responses = sorted(completed_original[bayes_manager.response_col].values)
-        new_responses = sorted(completed_new[bayes_manager.response_col].values)
-        
-        # Should contain the original responses
-        for orig_resp in original_responses:
-            assert any(abs(new_resp - orig_resp) < 1e-10 for new_resp in new_responses)
-    
-    def test_write_self_to_client_handles_nan_responses(self, sample_client):
-        """Test that NaN responses are handled correctly."""
-        # Add a trial with NaN response
-        sample_client.attach_trial(parameters={"x1": 0.3, "x2": 0.1, "x3": 1.0})
-        # Don't complete this trial, so it will have NaN response
-        
-        manager = BayesClientManager(sample_client)
-        
-        # This should not raise an error
-        result_manager = manager.write_self_to_client()
-        assert result_manager == manager
-        
-        # Check that the incomplete trial is handled
-        df = manager.df
-        incomplete_trials = df[df[manager.response_col].isna()]
-        # Should still have the incomplete trial
-        assert len(incomplete_trials) >= 1
-    
-    def test_write_self_to_client_generation_strategy(self, bayes_manager):
-        """Test that generation strategy is properly set."""
-        bayes_manager.write_self_to_client()
-        
-        # Check that client has a generation strategy
-        assert bayes_manager.client._generation_strategy is not None
-        
-        # Should be able to get next trials
-        try:
-            bayes_manager.client.get_next_trials(max_trials=1)
-            success = True
-        except Exception:
-            success = False
-        
-        assert success, "Should be able to generate new trials after write_self_to_client"
-    
-    def test_write_self_to_client_experiment_config(self, bayes_manager):
-        """Test that experiment configuration is preserved."""
-        original_exp_name = bayes_manager.client._experiment.name
-        original_metrics = list(bayes_manager.client._experiment.metrics.keys())
-        original_params = {
-            name: (param.lower, param.upper) 
-            for name, param in bayes_manager.client._experiment.parameters.items()
-        }
-        
-        bayes_manager.write_self_to_client()
-        
-        # Check experiment configuration
-        new_exp = bayes_manager.client._experiment
-        new_params = {
-            name: (param.lower, param.upper) 
-            for name, param in new_exp.parameters.items()
-        }
-        new_metrics = list(new_exp.metrics.keys())
-        
-        assert new_params == original_params
-        assert new_metrics == original_metrics
-    
-    def test_write_self_to_client_idempotent(self, bayes_manager):
-        """Test that calling write_self_to_client multiple times gives consistent results."""
-        # First call
-        bayes_manager.write_self_to_client()
-        df_first = bayes_manager.df.copy()
-        
-        # Second call
-        bayes_manager.write_self_to_client()
-        df_second = bayes_manager.df.copy()
-        
-        # Results should be consistent
-        assert len(df_first) == len(df_second)
-        
-        # Response values should be the same for completed trials
-        completed_first = df_first.dropna(subset=[bayes_manager.response_col])
-        completed_second = df_second.dropna(subset=[bayes_manager.response_col])
-        
-        assert len(completed_first) == len(completed_second)
-    
-    def test_write_self_to_client_custom_gp_acqf(self, sample_client):
-        """Test that custom GP and acquisition function are used."""
-        from botorch.acquisition import qUpperConfidenceBound
-        from botorch.models import SingleTaskGP
-        
-        # Create manager with custom GP and acquisition function
+    def test_init_valid_data(self, sample_data, feature_labels, response_label, bounds):
+        """Test initialization with valid data"""
         manager = BayesClientManager(
-            sample_client, 
-            gaussian_process=SingleTaskGP,
-            acqf_class=qUpperConfidenceBound
+            data=sample_data, 
+            feature_labels=feature_labels, 
+            response_label=response_label, 
+            bounds=bounds
         )
         
-        # Store original values to compare
-        original_gp = manager.gaussian_process
-        original_acqf = manager.acqf_class
+        assert manager.feature_labels == feature_labels
+        assert manager.response_label == response_label
+        assert manager.bounds == bounds
+        assert manager.group_label == "group"
+        assert manager.id_label == "unique_id"
+        assert len(manager.data) == len(sample_data)
+        assert "group" in manager.data.columns
+        assert "unique_id" in manager.data.columns
+
+    def test_init_missing_response_label(self, sample_data, feature_labels):
+        """Test initialization with missing response label"""
+        with pytest.raises(ValueError, match="Response label 'missing_y' not found in data columns"):
+            BayesClientManager(
+                data=sample_data, 
+                feature_labels=feature_labels, 
+                response_label='missing_y'
+            )
+
+    def test_init_missing_feature_labels(self, sample_data, response_label):
+        """Test initialization with missing feature labels"""
+        missing_features = ['x1', 'missing_x']
+        with pytest.raises(ValueError, match="Feature labels \\['missing_x'\\] not found in data columns"):
+            BayesClientManager(
+                data=sample_data, 
+                feature_labels=missing_features, 
+                response_label=response_label
+            )
+
+    def test_preprocess_data_generates_group_labels(self, sample_data, feature_labels, response_label):
+        """Test that preprocessing generates group labels"""
+        manager = BayesClientManager(
+            data=sample_data, 
+            feature_labels=feature_labels, 
+            response_label=response_label
+        )
         
-        result_manager = manager.write_self_to_client()
+        # Check that groups are assigned correctly
+        assert "group" in manager.data.columns
+        # Rows with same feature combinations should have same group
+        group_0_rows = manager.data[manager.data['group'] == 0]
+        assert len(group_0_rows) == 2  # Two rows with x1=0.1, x2=1.0
+
+    def test_preprocess_data_generates_unique_ids(self, sample_data, feature_labels, response_label):
+        """Test that preprocessing generates unique IDs"""
+        manager = BayesClientManager(
+            data=sample_data, 
+            feature_labels=feature_labels, 
+            response_label=response_label
+        )
         
-        # Check that the custom GP and acquisition function are preserved
-        assert result_manager.gaussian_process == SingleTaskGP
-        assert result_manager.acqf_class == qUpperConfidenceBound
-        assert original_gp == SingleTaskGP
-        assert original_acqf == qUpperConfidenceBound
+        assert "unique_id" in manager.data.columns
+        unique_ids = manager.data['unique_id'].unique()
+        assert len(unique_ids) == len(manager.data)  # All IDs should be unique
+        # Check ID format (8 characters)
+        for uid in unique_ids:
+            assert len(uid) == 8
+
+    def test_preprocess_bounds_valid(self, manager):
+        """Test bounds preprocessing with valid bounds"""
+        bounds = {'x1': (0.0, 1.0), 'x2': (0.5, 1.5)}
+        processed = manager._preprocess_bounds(bounds)
+        assert processed == bounds
+
+    def test_preprocess_bounds_unknown_features(self, manager):
+        """Test bounds preprocessing with unknown features"""
+        bounds = {'x1': (0.0, 1.0), 'unknown': (0.0, 1.0)}
+        with pytest.raises(ValueError, match="Bounds specified for unknown features: \\['unknown'\\]"):
+            manager._preprocess_bounds(bounds)
+
+    def test_preprocess_bounds_invalid_range(self, manager):
+        """Test bounds preprocessing with invalid ranges"""
+        bounds = {'x1': (1.0, 0.0)}  # low >= high
+        with pytest.raises(ValueError, match="Invalid bounds for feature 'x1': low 1.0 must be less than high 0.0"):
+            manager._preprocess_bounds(bounds)
+
+    def test_gp_property_default(self, manager):
+        """Test GP property default value"""
+        assert manager.gp == SingleTaskGP
+
+    def test_gp_property_setter_valid(self, manager):
+        """Test GP property setter with valid model"""
+        manager.gp = "SingleTaskGP"
+        assert manager.gp == SingleTaskGP
+
+    def test_gp_property_setter_invalid(self, manager):
+        """Test GP property setter with invalid model"""
+        with pytest.raises(ValueError, match="GP model 'InvalidGP' not recognized"):
+            manager.gp = "InvalidGP"
+
+    def test_acquisition_function_property_default(self, manager):
+        """Test acquisition function property default value"""
+        assert manager.acquisition_function == qLogExpectedImprovement
+
+    def test_acquisition_function_property_setter_valid(self, manager):
+        """Test acquisition function property setter with valid function"""
+        manager.acquisition_function = "qLogExpectedImprovement"
+        assert manager.acquisition_function == qLogExpectedImprovement
+
+    def test_acquisition_function_property_setter_invalid(self, manager):
+        """Test acquisition function property setter with invalid function"""
+        with pytest.raises(ValueError, match="Acquisition function 'InvalidAcqf' not recognized"):
+            manager.acquisition_function = "InvalidAcqf"
+
+    def test_X_property(self, manager):
+        """Test X property returns correct feature matrix"""
+        X = manager.X
+        assert isinstance(X, np.ndarray)
+        assert X.shape == (5, 2)  # 5 rows, 2 features
+        assert np.allclose(X[:, 0], [0.1, 0.4, 0.5, 0.7, 0.1])
+        assert np.allclose(X[:, 1], [1.0, 0.9, 0.8, 0.6, 1.0])
+
+    def test_Y_property(self, manager):
+        """Test Y property returns correct response matrix"""
+        Y = manager.Y
+        assert isinstance(Y, np.ndarray)
+        assert Y.shape == (5, 1)  # 5 rows, 1 response
+        expected = np.array([[0.5], [0.6], [0.55], [np.nan], [0.45]])
+        # Compare non-NaN values
+        mask = ~np.isnan(expected.flatten())
+        assert np.allclose(Y[mask], expected[mask])
+        # Check NaN positions
+        assert np.isnan(Y[3, 0])
+
+    def test_ax_parameters_property(self, manager):
+        """Test _ax_parameters property"""
+        params = manager._ax_parameters
+        assert len(params) == 2
         
-        # Check that the new client has a generation strategy
-        assert result_manager.client._generation_strategy is not None
+        # Check first parameter (x1)
+        assert params[0].name == 'x1'
+        assert params[0].parameter_type == 'float'
+        assert params[0].bounds == (0.0, 1.0)
+        assert params[0].scaling == 'linear'
+        
+        # Check second parameter (x2)
+        assert params[1].name == 'x2'
+        assert params[1].parameter_type == 'float'
+        assert params[1].bounds == (0.5, 1.5)
+        assert params[1].scaling == 'log'
+
+    def test_agg_stats_property(self, manager):
+        """Test agg_stats property"""
+        stats = manager.agg_stats
+        assert isinstance(stats, pd.DataFrame)
+        expected_columns = ['group', 'x1', 'x2', 'mean', 'std', 'count']
+        for col in expected_columns:
+            assert col in stats.columns
+
+    def test_get_best_coordinates(self, manager):
+        """Test get_best_coordinates method"""
+        best_coords = manager.get_best_coordinates()
+        assert isinstance(best_coords, dict)
+        assert 'x1' in best_coords
+        assert 'x2' in best_coords
+        # Should return coordinates of best performing observation
+        # In our sample data, y=0.6 is the highest value at x1=0.4, x2=0.9
+        assert best_coords['x1'] == 0.4
+        assert best_coords['x2'] == 0.9
+
+    def test_get_best_coordinates_empty_stats(self):
+        """Test get_best_coordinates with empty aggregated stats"""
+        # Create manager with no valid data
+        empty_data = pd.DataFrame({'x1': [], 'x2': [], 'y': []})
+        manager = BayesClientManager(
+            data=empty_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        assert manager.get_best_coordinates() is None
+
+    def test_complete_trial_by_id(self, manager):
+        """Test complete_trial_by_id method"""
+        # Get a unique ID from the data
+        unique_id = manager.data.iloc[3]['unique_id']  # Row with NaN response
+        
+        # Complete the trial
+        manager.complete_trial_by_id(unique_id, 0.8)
+        
+        # Check that the response was updated
+        updated_row = manager.data[manager.data['unique_id'] == unique_id]
+        assert updated_row['y'].iloc[0] == 0.8
+
+    def test_pending_targets_property(self, manager):
+        """Test pending_targets property"""
+        pending = manager.pending_targets
+        assert isinstance(pending, pd.DataFrame)
+        assert len(pending) == 1  # Only one NaN value in our sample data
+        assert np.isnan(pending['y'].iloc[0])
+
+    @patch('src.BayesClientManager.ax_helper')
+    @patch('src.BayesClientManager.Client')
+    def test_create_ax_client(self, mock_client_class, mock_ax_helper, manager):
+        """Test _create_ax_client method"""
+        mock_strategy = Mock()
+        mock_ax_helper.get_full_strategy.return_value = mock_strategy
+        
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
+        client = manager._create_ax_client()
+        
+        # Verify client configuration calls
+        mock_client.configure_experiment.assert_called_once()
+        mock_client.configure_optimization.assert_called_once_with(objective='y')
+        mock_client.set_generation_strategy.assert_called_once_with(generation_strategy=mock_strategy)
+
+    @patch('src.BayesClientManager.ax_helper')
+    @patch('src.BayesClientManager.Client')
+    def test_load_data_to_client(self, mock_client_class, mock_ax_helper, manager):
+        """Test load_data_to_client method"""
+        mock_strategy = Mock()
+        mock_ax_helper.get_full_strategy.return_value = mock_strategy
+        
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        mock_client.attach_trial.return_value = 0
+        
+        client = manager.load_data_to_client()
+        
+        # Should attach trials for all rows
+        assert mock_client.attach_trial.call_count == 5
+        # Should complete trials for non-NaN responses (4 trials)
+        assert mock_client.complete_trial.call_count == 4
+
+    @patch('src.BayesClientManager.ax_helper')
+    def test_retrieve_data_from_client(self, mock_ax_helper, manager):
+        """Test retrieve_data_from_client method"""
+        mock_client = Mock()
+        mock_df = pd.DataFrame({
+            'x1': [0.1, 0.2],
+            'x2': [1.0, 0.8], 
+            'y': [0.5, 0.7]
+        })
+        mock_ax_helper.get_obs_from_client.return_value = mock_df
+        
+        result_df = manager.retrieve_data_from_client(mock_client)
+        
+        assert isinstance(result_df, pd.DataFrame)
+        assert 'group' in result_df.columns
+        assert 'unique_id' in result_df.columns
+
+    def test_init_from_client_invalid_client(self):
+        """Test init_from_client with invalid client"""
+        with pytest.raises(ValueError, match="Provided client is not an instance of ax.Client"):
+            BayesClientManager.init_from_client("not_a_client")
+
+    @patch('src.BayesClientManager.ax_helper')
+    def test_init_from_client_valid(self, mock_ax_helper):
+        """Test init_from_client with valid client"""
+        mock_client = Mock(spec=Client)
+        mock_client._experiment.parameters.keys.return_value = ['x1', 'x2']
+        mock_client._experiment.metrics.keys.return_value = ['y']
+        
+        mock_df = pd.DataFrame({
+            'x1': [0.1, 0.2],
+            'x2': [1.0, 0.8], 
+            'y': [0.5, 0.7]
+        })
+        mock_ax_helper.get_obs_from_client.return_value = mock_df
+        
+        manager = BayesClientManager.init_from_client(mock_client)
+        
+        assert manager.feature_labels == ['x1', 'x2']
+        assert manager.response_label == 'y'
+
+    @patch('src.BayesClientManager.ax_helper')
+    @patch('src.BayesClientManager.Client')
+    def test_get_batch_targets(self, mock_client_class, mock_ax_helper, manager):
+        """Test get_batch_targets method"""
+        mock_strategy = Mock()
+        mock_ax_helper.get_full_strategy.return_value = mock_strategy
+        
+        # Mock the returned data with new targets
+        mock_new_data = manager.data.copy()
+        mock_new_data = pd.concat([mock_new_data, pd.DataFrame({
+            'x1': [0.3, 0.6],
+            'x2': [0.7, 1.2],
+            'y': [np.nan, np.nan]
+        })], ignore_index=True)
+        mock_ax_helper.get_obs_from_client.return_value = mock_new_data
+        
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        mock_client.attach_trial.return_value = 0
+        
+        result = manager.get_batch_targets(n_targets=2)
+        
+        mock_client.get_next_trials.assert_called_once_with(max_trials=2)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_edge_case_empty_dataframe(self):
+        """Test behavior with empty DataFrame"""
+        empty_data = pd.DataFrame({'x1': [], 'x2': [], 'y': []})
+        manager = BayesClientManager(
+            data=empty_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        assert len(manager.data) == 0
+        assert manager.X.shape == (0, 2)
+        assert manager.Y.shape == (0, 1)
+        assert len(manager.pending_targets) == 0
+
+    def test_edge_case_all_nan_responses(self):
+        """Test behavior with all NaN responses"""
+        all_nan_data = pd.DataFrame({
+            'x1': [0.1, 0.2, 0.3],
+            'x2': [1.0, 0.9, 0.8],
+            'y': [np.nan, np.nan, np.nan]
+        })
+        manager = BayesClientManager(
+            data=all_nan_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        assert len(manager.pending_targets) == 3
+        # Y should contain all NaN values
+        assert np.all(np.isnan(manager.Y))
+
+    def test_edge_case_single_row(self):
+        """Test behavior with single row DataFrame"""
+        single_row_data = pd.DataFrame({
+            'x1': [0.5],
+            'x2': [1.0],
+            'y': [0.7]
+        })
+        manager = BayesClientManager(
+            data=single_row_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        assert len(manager.data) == 1
+        assert manager.X.shape == (1, 2)
+        assert manager.Y.shape == (1, 1)
+        assert len(manager.pending_targets) == 0
+
+    def test_edge_case_duplicate_coordinates(self):
+        """Test behavior with duplicate coordinates"""
+        duplicate_data = pd.DataFrame({
+            'x1': [0.5, 0.5, 0.5],
+            'x2': [1.0, 1.0, 1.0],
+            'y': [0.7, 0.8, 0.6]
+        })
+        manager = BayesClientManager(
+            data=duplicate_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        # All rows should have the same group
+        assert len(manager.data['group'].unique()) == 1
+        # Should have aggregated stats for the group
+        stats = manager.agg_stats
+        assert len(stats) == 1
+        assert stats['count'].iloc[0] == 3
+
+    def test_bounds_none(self, sample_data, feature_labels, response_label):
+        """Test initialization with None bounds"""
+        manager = BayesClientManager(
+            data=sample_data, 
+            feature_labels=feature_labels, 
+            response_label=response_label, 
+            bounds=None
+        )
+        assert manager.bounds is None
+
+    def test_data_modification_after_init(self, manager):
+        """Test that data modifications work correctly"""
+        original_length = len(manager.data)
+        
+        # Complete a trial
+        pending_id = manager.pending_targets.iloc[0]['unique_id']
+        manager.complete_trial_by_id(pending_id, 0.9)
+        
+        # Data length should remain same
+        assert len(manager.data) == original_length
+        # No pending targets should remain
+        assert len(manager.pending_targets) == 0
+
+    def test_data_preprocessing_preserves_existing_columns(self):
+        """Test that preprocessing preserves existing group and id columns"""
+        data_with_existing = pd.DataFrame({
+            'x1': [0.1, 0.2],
+            'x2': [1.0, 0.9],
+            'y': [0.5, 0.6],
+            'group': [0, 1],
+            'unique_id': ['id1', 'id2']
+        })
+        
+        manager = BayesClientManager(
+            data=data_with_existing, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        # Should preserve existing group and id values
+        assert list(manager.data['group']) == [0, 1]
+        assert list(manager.data['unique_id']) == ['id1', 'id2']
+
+    def test_stress_large_dataset(self):
+        """Test behavior with a larger dataset"""
+        n_samples = 1000
+        np.random.seed(42)  # For reproducible tests
+        
+        large_data = pd.DataFrame({
+            'x1': np.random.uniform(0, 1, n_samples),
+            'x2': np.random.uniform(0.5, 1.5, n_samples),
+            'y': np.random.uniform(0, 1, n_samples)
+        })
+        
+        # Add some NaN values
+        large_data.loc[np.random.choice(n_samples, 100, replace=False), 'y'] = np.nan
+        
+        bounds = {'x1': (0.0, 1.0, False), 'x2': (0.5, 1.5, True)}
+        manager = BayesClientManager(
+            data=large_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y',
+            bounds=bounds
+        )
+        
+        assert len(manager.data) == n_samples
+        assert len(manager.pending_targets) == 100
+        assert manager.X.shape == (n_samples, 2)
+        assert manager.Y.shape == (n_samples, 1)
+
+    def test_string_feature_handling(self):
+        """Test behavior with string feature labels containing special characters"""
+        special_data = pd.DataFrame({
+            'feature_1': [0.1, 0.2, 0.3],
+            'feature-2': [1.0, 0.9, 0.8],
+            'response_var': [0.5, 0.6, 0.7]
+        })
+        
+        manager = BayesClientManager(
+            data=special_data, 
+            feature_labels=['feature_1', 'feature-2'], 
+            response_label='response_var'
+        )
+        
+        assert 'feature_1' in manager.feature_labels
+        assert 'feature-2' in manager.feature_labels
+        assert manager.response_label == 'response_var'
+
+    def test_numerical_precision_edge_cases(self):
+        """Test behavior with very small and very large numbers"""
+        precision_data = pd.DataFrame({
+            'x1': [1e-10, 1e10, 0.5],
+            'x2': [1e-5, 1e5, 1.0],
+            'y': [1e-8, 1e8, 0.5]
+        })
+        
+        manager = BayesClientManager(
+            data=precision_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        assert len(manager.data) == 3
+        assert not np.any(np.isnan(manager.X))
+        assert not np.any(np.isnan(manager.Y))
+
+    def test_complete_trial_by_id_nonexistent_id(self, manager):
+        """Test completing trial with non-existent ID"""
+        original_data = manager.data.copy()
+        
+        # Try to complete a trial with non-existent ID
+        manager.complete_trial_by_id('nonexistent_id', 0.8)
+        
+        # Data should remain unchanged
+        pd.testing.assert_frame_equal(manager.data, original_data)
+
+    def test_get_best_coordinates_with_ties(self):
+        """Test get_best_coordinates when there are tied best values"""
+        tie_data = pd.DataFrame({
+            'x1': [0.1, 0.2, 0.3],
+            'x2': [1.0, 0.9, 0.8],
+            'y': [0.8, 0.8, 0.7]  # Two tied best values
+        })
+        
+        manager = BayesClientManager(
+            data=tie_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        best_coords = manager.get_best_coordinates()
+        assert isinstance(best_coords, dict)
+        # Should return one of the tied values (first occurrence typically)
+        assert best_coords['x1'] in [0.1, 0.2]
+
+    def test_bounds_with_zero_range(self):
+        """Test bounds preprocessing with zero range (edge case)"""
+        zero_range_data = pd.DataFrame({
+            'x1': [0.5, 0.5, 0.5],  # All same value
+            'x2': [1.0, 1.1, 1.2],
+            'y': [0.5, 0.6, 0.7]
+        })
+        
+        manager = BayesClientManager(
+            data=zero_range_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        # This should work even though x1 has no variation
+        assert len(manager.data) == 3
+        assert manager.X[:, 0].std() == 0  # x1 has no variation
+
+    def test_mixed_data_types_in_response(self):
+        """Test behavior with mixed data types that can be converted to float"""
+        mixed_data = pd.DataFrame({
+            'x1': [0.1, 0.2, 0.3],
+            'x2': [1.0, 0.9, 0.8],
+            'y': [0.5, '0.6', 0.7]  # Mixed string and float
+        })
+        
+        # Convert string to float explicitly before passing to manager
+        mixed_data['y'] = pd.to_numeric(mixed_data['y'], errors='coerce')
+        
+        manager = BayesClientManager(
+            data=mixed_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        assert len(manager.data) == 3
+        assert np.all(~np.isnan(manager.Y))
+
+    def test_agg_stats_with_single_group(self):
+        """Test aggregated statistics with only one group"""
+        single_group_data = pd.DataFrame({
+            'x1': [0.5, 0.5, 0.5],  # Same coordinates
+            'x2': [1.0, 1.0, 1.0],
+            'y': [0.5, 0.6, 0.7]
+        })
+        
+        manager = BayesClientManager(
+            data=single_group_data, 
+            feature_labels=['x1', 'x2'], 
+            response_label='y'
+        )
+        
+        stats = manager.agg_stats
+        assert len(stats) == 1
+        assert stats['count'].iloc[0] == 3
+        assert abs(stats['mean'].iloc[0] - 0.6) < 1e-10  # Average of 0.5, 0.6, 0.7
+
+    def test_property_setters_chain(self, manager):
+        """Test that property setters can be chained and work correctly"""
+        # Test that we can set both GP and acquisition function
+        manager.gp = "SingleTaskGP"
+        manager.acquisition_function = "qLogExpectedImprovement"
+        
+        assert manager.gp == SingleTaskGP
+        assert manager.acquisition_function == qLogExpectedImprovement
+        
+        # Test setting them again doesn't break anything
+        manager.gp = "SingleTaskGP"
+        manager.acquisition_function = "qLogExpectedImprovement"
+        
+        assert manager.gp == SingleTaskGP
+        assert manager.acquisition_function == qLogExpectedImprovement
 
 
-if __name__ == "__main__":
-    # Run tests with pytest
-    pytest.main([__file__, "-v"])
+
+

@@ -1,9 +1,8 @@
 import json
 
-from ipykernel.pickleutil import can
 from src.GPVisualiser import GPVisualiserPlotly
 from src.model_generation import HeteroWhiteSGP
-from src.ax_helper import BayesClientManager
+from src.BayesClientManager import BayesClientManager
 import pandas as pd
 import streamlit as st
 from botorch.models import SingleTaskGP
@@ -13,9 +12,6 @@ from botorch.models import SingleTaskGP
 class BayesPlotter:
     def __init__ (self, bayes_manager: BayesClientManager):
         self.bayes_manager = bayes_manager
-        self.param_ranges = bayes_manager.get_parameter_ranges()
-        self.input_cols = bayes_manager.input_cols
-
 
     @st.fragment
     def choose_plot_coordinates(self):
@@ -67,13 +63,17 @@ class BayesPlotter:
 
         # Move the plotting logic outside the columns
         if plot_button and self.can_plot:
-            coords = list(st.session_state.manual_coords_df['value'].values)
-            if len(coords) != len(self.bayes_manager.input_cols):
-                st.error(f"Please provide exactly {len(self.bayes_manager.input_cols)} coordinates.")
-            self.plot_gaussian_process(gp_model=SingleTaskGP, coords=coords)
+            if self.plot_coords is None or len(self.plot_coords) != len(self.bayes_manager.feature_labels):
+                st.error(f"Please provide exactly {len(self.bayes_manager.feature_labels)} coordinates.")
+            self.plot_gaussian_process(gp_model=SingleTaskGP, coords=self.plot_coords)
         else:
             st.warning("No data available to plot the GP.")
 
+    @property
+    def plot_coords(self):
+        if "manual_coords_df" in st.session_state:
+            return list(st.session_state.manual_coords_df['value'].values)
+        return None
 
     def plot_gaussian_process(self, gp_model=SingleTaskGP, coords=None):
         """Plot the Gaussian Process using GPVisualiserPlotly"""
@@ -95,16 +95,16 @@ class BayesPlotter:
     def plot_group_performance(self):
         import plotly.express as px
         """Performance of each observation group as box plot"""
-        df = self.bayes_manager.get_batch_instance_repeat()
+        df = self.bayes_manager.data
 
         fig = px.box(
             data_frame=df,
             x=self.bayes_manager.group_label,
-            y=self.bayes_manager.response_col,
+            y=self.bayes_manager.response_label,
             points="all",
 
           #  category_orders={self.bayes_manager.group_label: order},
-            hover_data=[c for c in self.bayes_manager.input_cols if c in self.bayes_manager.df.columns],
+            #hover_data=[c for c in self.bayes_manager.input_cols if c in self.bayes_manager.df.columns],
             title="Group Performance Distribution",
         )
         fig.update_traces(boxmean="sd")
@@ -119,7 +119,11 @@ class BayesPlotter:
     
     @property
     def can_plot(self):
-        return not self.bayes_manager.df.empty
+        if self.bayes_manager.data.empty:
+            return False
+        elif self.bayes_manager.data[self.bayes_manager.response_label].isna().all():
+            return False
+        return True
     
 
     def main_loop(self):
@@ -137,7 +141,7 @@ if __name__ == "__main__":
         auckley_path = r"data/ax_clients/ackley_client.pkl"
         import pickle
         client = pickle.load(open(auckley_path, "rb"))
-        return BayesClientManager(client=client)
+        return BayesClientManager.init_from_client(client)
 
     def load_manual():
 
