@@ -81,13 +81,18 @@ class TestBayesClientManagerInitialization:
             'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
             'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
-        with pytest.raises(ValueError, match="Response label 'missing_y' not found in data columns"):
-            BayesClientManager(
-                data=sample_data,
-                feature_labels=feature_labels,
-                bounds=bounds,
-                response_label='missing_y'
-            )
+        
+        manager = BayesClientManager(
+            data=sample_data,
+            feature_labels=feature_labels,
+            bounds=bounds,
+            response_label='missing_y'
+        )
+
+        assert manager.response_label == 'missing_y'
+        assert 'missing_y' in manager.data.columns
+
+
 
     def test_init_missing_feature_labels(self, sample_data, response_label):
         """Test initialization with missing feature labels"""
@@ -1037,7 +1042,287 @@ class TestBayesClientManagerBounds:
         assert manager.acquisition_function == qLogExpectedImprovement
 
 
+class TestBayesClientManagerDataManipulation:
+    """Test suite for BayesClientManager new data manipulation methods"""
+    
+    @pytest.fixture
+    def sample_data(self):
+        """Sample data for testing"""
+        return pd.DataFrame({
+            'x1': [0.1, 0.4, 0.5, 0.7, 0.1],
+            'x2': [1.0, 0.9, 0.8, 0.6, 1.0],
+            'y': [0.5, 0.6, 0.55, np.nan, 0.45]
+        })
+    
+    @pytest.fixture
+    def feature_labels(self):
+        """Feature labels for testing"""
+        return ['x1', 'x2']
+    
+    @pytest.fixture
+    def response_label(self):
+        """Response label for testing"""
+        return 'y'
+    
+    @pytest.fixture
+    def bounds(self):
+        """Bounds for testing"""
+        return {
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
+        }
+    
+    @pytest.fixture
+    def manager(self, sample_data, feature_labels, response_label, bounds):
+        """BayesClientManager instance for testing"""
+        return BayesClientManager(
+            data=sample_data, 
+            feature_labels=feature_labels, 
+            response_label=response_label, 
+            bounds=bounds
+        )
 
+    def test_change_response_by_id_valid(self, manager):
+        """Test changing response by ID with valid ID"""
+        # Get a unique ID from the data
+        unique_id = manager.data.iloc[0]['unique_id']
+        original_response = manager.data.iloc[0]['y']
+        new_response = 0.9
+        
+        # Change the response
+        manager.change_response_by_id(unique_id, new_response)
+        
+        # Check that the response was updated
+        updated_row = manager.data[manager.data['unique_id'] == unique_id]
+        assert updated_row['y'].iloc[0] == new_response
+        assert updated_row['y'].iloc[0] != original_response
 
+    def test_change_response_by_id_nonexistent(self, manager):
+        """Test changing response by ID with non-existent ID"""
+        original_data = manager.data.copy()
+        
+        # Try to change response for non-existent ID
+        manager.change_response_by_id('nonexistent_id', 0.9)
+        
+        # Data should remain unchanged
+        pd.testing.assert_frame_equal(manager.data, original_data)
 
+    def test_change_response_by_id_nan_to_value(self, manager):
+        """Test changing NaN response to actual value"""
+        # Find a row with NaN response
+        nan_row = manager.data[manager.data['y'].isna()].iloc[0]
+        unique_id = nan_row['unique_id']
+        
+        # Change NaN to actual value
+        new_response = 0.8
+        manager.change_response_by_id(unique_id, new_response)
+        
+        # Check that NaN was replaced
+        updated_row = manager.data[manager.data['unique_id'] == unique_id]
+        assert updated_row['y'].iloc[0] == new_response
+        assert not np.isnan(updated_row['y'].iloc[0])
 
+    def test_delete_by_id_valid(self, manager):
+        """Test deleting row by ID with valid ID"""
+        # Get initial data length and a unique ID
+        initial_length = len(manager.data)
+        unique_id = manager.data.iloc[2]['unique_id']  # Middle row
+        
+        # Delete the row
+        manager.delete_by_id(unique_id)
+        
+        # Check that row was deleted
+        assert len(manager.data) == initial_length - 1
+        assert unique_id not in manager.data['unique_id'].values
+        
+        # Check that indices were reset correctly
+        assert list(manager.data.index) == list(range(len(manager.data)))
+
+    def test_delete_by_id_nonexistent(self, manager):
+        """Test deleting row by ID with non-existent ID"""
+        original_data = manager.data.copy()
+        
+        # Try to delete non-existent ID
+        manager.delete_by_id('nonexistent_id')
+        
+        # Data should remain unchanged
+        pd.testing.assert_frame_equal(manager.data, original_data)
+
+    def test_delete_by_id_multiple_deletions(self, manager):
+        """Test multiple deletions"""
+        initial_length = len(manager.data)
+        id1 = manager.data.iloc[0]['unique_id']
+        id2 = manager.data.iloc[1]['unique_id']
+        
+        # Delete first row
+        manager.delete_by_id(id1)
+        assert len(manager.data) == initial_length - 1
+        
+        # Delete second row (now shifted)
+        manager.delete_by_id(id2)
+        assert len(manager.data) == initial_length - 2
+        
+        # Check neither ID exists
+        assert id1 not in manager.data['unique_id'].values
+        assert id2 not in manager.data['unique_id'].values
+
+    def test_get_group_for_coords_existing(self, manager):
+        """Test getting group for existing coordinates"""
+        # Use coordinates from existing data
+        coords = [0.1, 1.0]  # Should match first and last rows (same group)
+        group = manager._get_group_for_coords(coords)
+        
+        # Should return the group of matching rows
+        expected_group = manager.data[(manager.data['x1'] == 0.1) & (manager.data['x2'] == 1.0)]['group'].iloc[0]
+        assert group == expected_group
+
+    def test_get_group_for_coords_new(self, manager):
+        """Test getting group for new coordinates"""
+        # Use coordinates that don't exist in data
+        coords = [0.9, 0.7]
+        group = manager._get_group_for_coords(coords)
+        
+        # Should return max group + 1
+        expected_group = manager.data['group'].max() + 1
+        assert group == expected_group
+
+    def test_get_group_for_coords_wrong_length(self, manager):
+        """Test getting group with wrong coordinate length"""
+        # Wrong number of coordinates
+        coords = [0.1]  # Should be 2 coordinates
+        
+        with pytest.raises(ValueError, match="Coordinates length 1 does not match number of features 2"):
+            manager._get_group_for_coords(coords)
+
+    def test_add_new_entry_basic(self, manager):
+        """Test adding new entry with basic data"""
+        initial_length = len(manager.data)
+        
+        # Create new entry
+        new_entry = pd.DataFrame({
+            'x1': [0.3],
+            'x2': [0.7],
+            'y': [0.75]
+        })
+        
+        manager.add_new_entry(new_entry)
+        
+        # Check that entry was added
+        assert len(manager.data) == initial_length + 1
+        assert manager.data.iloc[-1]['x1'] == 0.3
+        assert manager.data.iloc[-1]['x2'] == 0.7
+        assert manager.data.iloc[-1]['y'] == 0.75
+        
+        # Check that group and ID were auto-generated
+        assert 'group' in manager.data.columns
+        assert 'unique_id' in manager.data.columns
+        assert not pd.isna(manager.data.iloc[-1]['group'])
+        assert not pd.isna(manager.data.iloc[-1]['unique_id'])
+
+    def test_add_new_entry_transposed(self, manager):
+        """Test adding new entry that needs transposing"""
+        initial_length = len(manager.data)
+        
+        # Create transposed entry (features as index)
+        new_entry = pd.DataFrame({
+            0: [0.3, 0.7, 0.75]
+        }, index=['x1', 'x2', 'y'])
+        
+        manager.add_new_entry(new_entry)
+        
+        # Check that entry was added correctly
+        assert len(manager.data) == initial_length + 1
+        assert manager.data.iloc[-1]['x1'] == 0.3
+        assert manager.data.iloc[-1]['x2'] == 0.7
+        assert manager.data.iloc[-1]['y'] == 0.75
+
+    def test_add_new_entry_with_existing_coords(self, manager):
+        """Test adding entry with existing coordinates"""
+        initial_length = len(manager.data)
+        
+        # Use coordinates that already exist (should get same group)
+        existing_coords = [0.1, 1.0]  # These exist in the data
+        expected_group = manager.data[(manager.data['x1'] == 0.1) & (manager.data['x2'] == 1.0)]['group'].iloc[0]
+        
+        new_entry = pd.DataFrame({
+            'x1': [0.1],
+            'x2': [1.0],
+            'y': [0.85]
+        })
+        
+        manager.add_new_entry(new_entry)
+        
+        # Check that entry was added with correct group
+        assert len(manager.data) == initial_length + 1
+        new_row = manager.data.iloc[-1]
+        assert new_row['group'] == expected_group
+
+    def test_add_new_entry_missing_columns(self, manager):
+        """Test adding entry with missing required columns"""
+        # Missing response column
+        incomplete_entry = pd.DataFrame({
+            'x1': [0.3],
+            'x2': [0.7]
+            # Missing 'y'
+        })
+        
+        with pytest.raises(ValueError, match="Entry is missing required columns: \\['y'\\]"):
+            manager.add_new_entry(incomplete_entry)
+        
+        # Missing feature column
+        incomplete_entry2 = pd.DataFrame({
+            'x1': [0.3],
+            'y': [0.75]
+            # Missing 'x2'
+        })
+        
+        with pytest.raises(ValueError, match="Entry is missing required columns: \\['x2'\\]"):
+            manager.add_new_entry(incomplete_entry2)
+
+    def test_add_new_entry_with_predefined_group_and_id(self, manager):
+        """Test adding entry with predefined group and unique_id"""
+        initial_length = len(manager.data)
+        
+        new_entry = pd.DataFrame({
+            'x1': [0.3],
+            'x2': [0.7],
+            'y': [0.75],
+            'group': [99],
+            'unique_id': ['custom_id']
+        })
+        
+        manager.add_new_entry(new_entry)
+        
+        # Check that predefined values were preserved
+        assert len(manager.data) == initial_length + 1
+        new_row = manager.data.iloc[-1]
+        assert new_row['group'] == 99
+        assert new_row['unique_id'] == 'custom_id'
+
+    def test_integration_add_then_modify(self, manager):
+        """Test integration: add entry then modify it"""
+        # Add new entry
+        new_entry = pd.DataFrame({
+            'x1': [0.25],
+            'x2': [0.85],
+            'y': [0.6]
+        })
+        manager.add_new_entry(new_entry)
+        
+        # Get the ID of the new entry
+        new_id = manager.data.iloc[-1]['unique_id']
+        
+        # Modify the response
+        manager.change_response_by_id(new_id, 0.95)
+        
+        # Check modification worked
+        updated_row = manager.data[manager.data['unique_id'] == new_id]
+        assert updated_row['y'].iloc[0] == 0.95
+        
+        # Delete the entry
+        initial_length = len(manager.data)
+        manager.delete_by_id(new_id)
+        
+        # Check deletion worked
+        assert len(manager.data) == initial_length - 1
+        assert new_id not in manager.data['unique_id'].values

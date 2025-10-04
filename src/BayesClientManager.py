@@ -2,7 +2,6 @@ import pandas as pd
 import uuid
 from botorch.models import SingleTaskGP
 from botorch.acquisition import qLogExpectedImprovement
-import ax
 from ax import Client
 from src import ax_helper
 import numpy as np
@@ -52,13 +51,14 @@ class BayesClientManager:
         elif self.objective_direction == "minimise":
             return "loss"
 
+    @staticmethod
+    def _generate_id():
+        return str(uuid.uuid4())[:8]
 
     def _preprocess_data(self, data: pd.DataFrame):
         """Preprocess data for loading"""
         if self.response_label not in data.columns:
-            raise ValueError(
-                f"Response label '{self.response_label}' not found in data columns."
-            )
+            data[self.response_label] = np.nan
         elif not all(label in data.columns for label in self.feature_labels):
             missing = [
                 label for label in self.feature_labels if label not in data.columns
@@ -73,7 +73,7 @@ class BayesClientManager:
         def generate_id_labels(df: pd.DataFrame):
 
             # Generate shorter unique IDs (first 8 characters of UUID)
-            ids = [str(uuid.uuid4())[:8] for _ in range(len(df))]
+            ids = [self._generate_id() for _ in range(len(df))]
             df[self.id_label] = ids
             return df
 
@@ -301,10 +301,27 @@ class BayesClientManager:
 
     def get_batch_targets(self, n_targets: int):
         """Get next batch of target points from the client"""
+        # Store existing response data to preserve it
+        existing_responses = self.data[[self.id_label, self.response_label]].copy()
+        
         client = self.load_data_to_client()
         client.get_next_trials(max_trials=n_targets)
 
-        self.data = self.retrieve_data_from_client(client)
+        # Get the updated data from client
+        new_data = self.retrieve_data_from_client(client)
+        
+        # Preserve existing response values by merging with stored responses
+        # Keep responses from existing_responses where they exist and are not NaN
+        for idx, row in new_data.iterrows():
+            row_id = row[self.id_label]
+            existing_row = existing_responses[existing_responses[self.id_label] == row_id]
+            
+            if not existing_row.empty:
+                existing_response = existing_row.iloc[0][self.response_label]
+                if not pd.isna(existing_response):
+                    new_data.loc[idx, self.response_label] = existing_response
+        
+        self.data = new_data
         return self.data
 
     def complete_trial_by_id(self, unique_id, response_value):
@@ -314,9 +331,75 @@ class BayesClientManager:
     @property
     def pending_targets(self):
         return self.data[self.data[self.response_label].isna()]
+    
+
+    def change_response_by_id(self, unique_id, new_response):
+        index = self.data[self.data[self.id_label] == unique_id].index
+        self.data.loc[index, self.response_label] = new_response
+
+    def delete_by_id(self, unique_id: str) -> None:
+        """Remove entry by unique ID and reset DataFrame index."""
+        matching_indices = self.data[self.data[self.id_label] == unique_id].index
+        if not matching_indices.empty:
+            self.data = self.data.drop(matching_indices).reset_index(drop=True)
+
+    def _get_group_for_coords(self, coords: list[float]) -> int:
+        """Get the group label for a given set of coordinates."""
+        if len(coords) != len(self.feature_labels):
+            raise ValueError(
+                f"Coordinates length {len(coords)} does not match number of features {len(self.feature_labels)}"
+            )
+        
+        # Find rows with matching coordinates
+        feature_data = self.data[self.feature_labels].to_numpy()
+        matching_mask = np.all(feature_data == coords, axis=1)
+        matching_rows = self.data[matching_mask]
+        
+        return (matching_rows.iloc[0][self.group_label] 
+                if not matching_rows.empty 
+                else self.data[self.group_label].max() + 1)
+
+    def add_new_entry(self, entry: pd.DataFrame) -> None:
+        """Add a new entry to the dataset with proper validation and preprocessing."""
+        # Handle transposed data format
+        if self.feature_labels[0] not in entry.columns:
+            entry = entry.T
+        
+        # Validate required columns
+        required_cols = self.feature_labels + [self.response_label]
+        missing_cols = [col for col in required_cols if col not in entry.columns]
+        if missing_cols:
+            raise ValueError(f"Entry is missing required columns: {missing_cols}")
+        
+        # Auto-generate group if not provided
+        if self.group_label not in entry.columns:
+            coords = entry[self.feature_labels].iloc[0].tolist()
+            entry[self.group_label] = self._get_group_for_coords(coords)
+        
+        # Auto-generate ID if not provided
+        if self.id_label not in entry.columns:
+            entry[self.id_label] = self._generate_id()
+        
+        # Add entry to dataset
+        self.data = pd.concat([self.data, entry], ignore_index=True)
+
+    @property
+    def current_group_labels(self) -> list[int]:
+        return sorted(self.data[self.group_label].dropna().unique().tolist())
+
+    def get_groups(self) -> dict[int, pd.DataFrame]:
+        """Get a dictionary of unique group labels and their corresponding data."""
+        return {label: self.data[self.data[self.group_label] == label] for label in self.current_group_labels}
+
+        
+
+        
+        
+  
 
 
-if __name__ == "__main__":
+
+def example_manager():
     df = pd.DataFrame(
         {
             "x1": [0.1, 0.4, 0.5, 0.7, 0.1],
@@ -337,4 +420,4 @@ if __name__ == "__main__":
         response_label=response_label,
         bounds=bounds,
     )
-    print(manager.get_batch_targets(n_targets=2))
+    return manager

@@ -3,7 +3,7 @@ import streamlit as st
 
 from ui.InitExperiment import InitExperiment
 from src.ax_helper import BayesClientManager
-from src.ui_group_manager import GroupManager
+from ui.GroupUi import GroupUi
 import pickle
 import json
 from ui.BayesPlotter import UiBayesPlotter
@@ -131,8 +131,8 @@ class main_manager():
 
 
     @property
-    def group_manager(self)->GroupManager:
-        return st.session_state.get("group_manager", GroupManager.init_from_manager(self.bayes_manager))
+    def group_manager(self)->GroupUi:
+        return st.session_state.get("group_manager", GroupUi.init_from_manager(self.bayes_manager))
 
         
     def run_group_manager(self):
@@ -146,7 +146,7 @@ class main_manager():
                     del st.session_state[key]
             st.rerun()
         
-        st.session_state.group_manager = GroupManager.init_from_manager(self.bayes_manager)
+        st.session_state.group_manager = GroupUi.init_from_manager(self.bayes_manager)
         self.group_manager.render_all()
         self.group_manager.show_data_stats()
 
