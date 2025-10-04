@@ -14,8 +14,9 @@ class BayesClientManager:
         self,
         data: pd.DataFrame,
         feature_labels: list[str],
-        response_label: str,
+        
         bounds: dict,
+        response_label: str = 'response',
     ) -> None:
         self.feature_labels = feature_labels
         self.response_label = response_label
@@ -28,9 +29,29 @@ class BayesClientManager:
 
         self.look_coords = np.zeros(len(feature_labels))
 
-    acquisition_function_dict = {"qLogExpectedImprovement": qLogExpectedImprovement}
+        self._objective_direction = "maximise"  # or "minimise"
 
-    gaussian_process_dict = {"SingleTaskGP": SingleTaskGP}
+    acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement}
+
+    gp_options = {"SingleTaskGP": SingleTaskGP}
+
+    @property
+    def objective_direction(self):
+        return self._objective_direction
+    
+    @objective_direction.setter
+    def objective_direction(self, direction: str):
+        if direction.lower() not in ["maximise", "minimise"]:
+            raise ValueError("Objective direction must be 'maximise' or 'minimise'")
+        self._objective_direction = direction.lower()
+
+    @property
+    def _ax_objective_direction(self):
+        if self.objective_direction == "maximise":
+            return "-loss"
+        elif self.objective_direction == "minimise":
+            return "loss"
+
 
     def _preprocess_data(self, data: pd.DataFrame):
         """Preprocess data for loading"""
@@ -78,8 +99,15 @@ class BayesClientManager:
         bounds = self._check_bound_structure(bounds)
         return bounds
 
-    def _check_bound_structure(self, bounds: dict):
-        """Check the structure of bounds for Bayesian optimization"""
+    def _check_bound_structure(self, bounds: dict) -> dict[dict]:
+        """Check the structure of bounds for Bayesian optimization
+        Bounds must be structured as follows:
+        {
+            "feature1": {"lower_bound": float, "upper_bound": float, "log_scale": bool},
+            "feature2": {"lower_bound": float, "upper_bound": float, "log_scale": bool},
+            ...
+        }
+        """
         if any(label not in self.feature_labels for label in bounds.keys()):
             missing = [
                 label for label in bounds.keys() if label not in self.feature_labels
@@ -93,7 +121,7 @@ class BayesClientManager:
                     f"Bounds for feature '{label}' must be a dictionary with 'lower', 'upper', and 'log' keys."
                 )
 
-            required_keys = {"lower", "upper", "log"}
+            required_keys = {"lower_bound", "upper_bound", "log_scale"}
             if not all(key in bound_config for key in required_keys):
                 missing_keys = required_keys - set(bound_config.keys())
                 raise ValueError(
@@ -101,9 +129,9 @@ class BayesClientManager:
                 )
 
             low, high, log = (
-                bound_config["lower"],
-                bound_config["upper"],
-                bound_config["log"],
+                bound_config["lower_bound"],
+                bound_config["upper_bound"],
+                bound_config["log_scale"],
             )
 
             if not (isinstance(low, (int, float)) and isinstance(high, (int, float))):
@@ -136,11 +164,11 @@ class BayesClientManager:
 
     @gp.setter
     def gp(self, gp_name: str):
-        if gp_name not in self.gaussian_process_dict:
+        if gp_name not in self.gp_options:
             raise ValueError(
-                f"GP model '{gp_name}' not recognized. Available models: {list(self.gaussian_process_dict.keys())}"
+                f"GP model '{gp_name}' not recognized. Available models: {list(self.gp_options.keys())}"
             )
-        self._gp = self.gaussian_process_dict[gp_name]
+        self._gp = self.gp_options[gp_name]
 
     @property
     def acquisition_function(self):
@@ -150,12 +178,12 @@ class BayesClientManager:
         return self._acquisition_function
 
     @acquisition_function.setter
-    def acquisition_function(self, acq_name: str):
-        if acq_name not in self.acquisition_function_dict:
+    def acquisition_function(self, acq_f_name: str):
+        if acq_f_name not in self.acq_f_options:
             raise ValueError(
-                f"Acquisition function '{acq_name}' not recognized. Available functions: {list(self.acquisition_function_dict.keys())}"
+                f"Acquisition function '{acq_f_name}' not recognized. Available functions: {list(self.acq_f_options.keys())}"
             )
-        self._acquisition_function = self.acquisition_function_dict[acq_name]
+        self._acquisition_function = self.acq_f_options[acq_f_name]
 
     @property
     def X(self):
@@ -182,8 +210,8 @@ class BayesClientManager:
             RangeParameterConfig(
                 name=label,
                 parameter_type="float",
-                bounds=(bound_config["lower"], bound_config["upper"]),
-                scaling="log" if bound_config["log"] else "linear",
+                bounds=(bound_config["lower_bound"], bound_config["upper_bound"]),
+                scaling="log_scale" if bound_config["log_scale"] else "linear",
             )
             for label, bound_config in self.bounds.items()
         ]
@@ -209,7 +237,7 @@ class BayesClientManager:
         client = Client()
 
         client.configure_experiment(parameters=self._ax_parameters)
-        client.configure_optimization(objective=self.response_label)
+        client.configure_optimization(objective=self._ax_objective_direction)
 
         generation_strategy = ax_helper.get_full_strategy(
             gp=self.gp, acqf_class=self.acquisition_function
@@ -254,7 +282,7 @@ class BayesClientManager:
         """Extract bounds from client parameters"""
         client_bounds = list(client._experiment.parameters.values())
         bounds = {
-            label: {"lower": param.lower, "upper": param.upper, "log": param.log_scale}
+            label: {"lower_bound": param.lower, "upper_bound": param.upper, "log_scale": param.log_scale}
             for label, param in zip(feature_labels, client_bounds)
         }
 
@@ -299,8 +327,8 @@ if __name__ == "__main__":
     feature_labels = ["x1", "x2"]
     response_label = "y"
     bounds = {
-        "x1": {"lower": 0.0, "upper": 1.0, "log": False},
-        "x2": {"lower": 0.5, "upper": 1.5, "log": True},
+        "x1": {"lower_bound": 0.0, "upper_bound": 1.0, "log_scale": False},
+        "x2": {"lower_bound": 0.5, "upper_bound": 1.5, "log_scale": True},
     }
 
     manager = BayesClientManager(

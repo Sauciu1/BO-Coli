@@ -43,8 +43,8 @@ class TestBayesClientManagerInitialization:
     def bounds(self):
         """Bounds for testing"""
         return {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
     
     @pytest.fixture
@@ -78,43 +78,43 @@ class TestBayesClientManagerInitialization:
     def test_init_missing_response_label(self, sample_data, feature_labels):
         """Test initialization with missing response label"""
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         with pytest.raises(ValueError, match="Response label 'missing_y' not found in data columns"):
             BayesClientManager(
                 data=sample_data,
                 feature_labels=feature_labels,
-                response_label='missing_y',
-                bounds=bounds
+                bounds=bounds,
+                response_label='missing_y'
             )
 
     def test_init_missing_feature_labels(self, sample_data, response_label):
         """Test initialization with missing feature labels"""
         missing_features = ['x1', 'missing_x']
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         with pytest.raises(ValueError, match="Feature labels \\['missing_x'\\] not found in data columns"):
             BayesClientManager(
                 data=sample_data,
                 feature_labels=missing_features,
-                response_label=response_label,
-                bounds=bounds
+                bounds=bounds,
+                response_label=response_label
             )
 
     def test_preprocess_data_generates_group_labels(self, sample_data, feature_labels, response_label):
         """Test that preprocessing generates group labels"""
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=sample_data,
             feature_labels=feature_labels,
-            response_label=response_label,
-            bounds=bounds
+            bounds=bounds,
+            response_label=response_label
         )        # Check that groups are assigned correctly
         assert "group" in manager.data.columns
         # Rows with same feature combinations should have same group
@@ -124,14 +124,14 @@ class TestBayesClientManagerInitialization:
     def test_preprocess_data_generates_unique_ids(self, sample_data, feature_labels, response_label):
         """Test that preprocessing generates unique IDs"""
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=sample_data,
             feature_labels=feature_labels,
-            response_label=response_label,
-            bounds=bounds
+            bounds=bounds,
+            response_label=response_label
         )
         assert "unique_id" in manager.data.columns
         unique_ids = manager.data['unique_id'].unique()
@@ -143,8 +143,8 @@ class TestBayesClientManagerInitialization:
     def test_preprocess_bounds_valid(self, manager):
         """Test bounds preprocessing with valid bounds"""
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         processed = manager._preprocess_bounds(bounds)
         assert processed == bounds
@@ -152,15 +152,15 @@ class TestBayesClientManagerInitialization:
     def test_preprocess_bounds_unknown_features(self, manager):
         """Test bounds preprocessing with unknown features"""
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'unknown': {'lower': 0.0, 'upper': 1.0, 'log': False}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'unknown': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}
         }
         with pytest.raises(ValueError, match="Bounds specified for unknown features: \\['unknown'\\]"):
             manager._preprocess_bounds(bounds)
 
     def test_preprocess_bounds_invalid_range(self, manager):
         """Test bounds preprocessing with invalid ranges"""
-        bounds = {'x1': {'lower': 1.0, 'upper': 0.0, 'log': False}}  # lower >= upper
+        bounds = {'x1': {'lower_bound': 1.0, 'upper_bound': 0.0, 'log_scale': False}}  # lower >= upper
         with pytest.raises(ValueError, match="Invalid bounds for feature 'x1': lower 1.0 must be less than upper 0.0"):
             manager._preprocess_bounds(bounds)
 
@@ -173,13 +173,13 @@ class TestBayesClientManagerInitialization:
 
     def test_preprocess_bounds_missing_keys(self, manager):
         """Test bounds preprocessing with missing required keys"""
-        bounds = {'x1': {'lower': 0.0, 'upper': 1.0}}  # missing 'log' key
+        bounds = {'x1': {'lower_bound': 0.0, 'upper_bound': 1.0}}  # missing 'log_scale' key
         with pytest.raises(ValueError, match="Bounds for feature 'x1' missing required keys"):
             manager._preprocess_bounds(bounds)
 
     def test_preprocess_bounds_invalid_log_type(self, manager):
         """Test bounds preprocessing with invalid log type"""
-        bounds = {'x1': {'lower': 0.0, 'upper': 1.0, 'log': 'yes'}}  # log should be bool
+        bounds = {'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': 'yes'}}  # log_scale should be bool
         with pytest.raises(ValueError, match="Log scaling for feature 'x1' must be a boolean value"):
             manager._preprocess_bounds(bounds)
 
@@ -198,15 +198,15 @@ class TestBayesClientManagerInitialization:
         assert params[1].name == 'x2'
         assert params[1].parameter_type == 'float'
         assert params[1].bounds == (0.5, 1.5)
-        assert params[1].scaling == 'log'
+        assert params[1].scaling == 'log_scale'
 
     def test_bounds_none(self, sample_data, feature_labels, response_label):
         """Test initialization with None bounds"""
         manager = BayesClientManager(
             data=sample_data, 
             feature_labels=feature_labels, 
-            response_label=response_label, 
-            bounds=None
+            bounds=None,
+            response_label=response_label
         )
         assert manager.bounds is None
 
@@ -237,8 +237,8 @@ class TestBayesClientManagerProperties:
     def bounds(self):
         """Bounds for testing"""
         return {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
     
     @pytest.fixture
@@ -323,14 +323,14 @@ class TestBayesClientManagerProperties:
         # Create manager with no valid data
         empty_data = pd.DataFrame({'x1': [], 'x2': [], 'y': []})
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=empty_data,
             feature_labels=['x1', 'x2'],
-            response_label='y',
-            bounds=bounds
+            bounds=bounds,
+            response_label='y'
         )
         assert manager.get_best_coordinates() is None
 
@@ -409,8 +409,8 @@ class TestBayesClientManagerAxIntegration:
     def bounds(self):
         """Bounds for testing"""
         return {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
     
     @pytest.fixture
@@ -437,7 +437,7 @@ class TestBayesClientManagerAxIntegration:
         
         # Verify client configuration calls
         mock_client.configure_experiment.assert_called_once()
-        mock_client.configure_optimization.assert_called_once_with(objective='y')
+        mock_client.configure_optimization.assert_called_once_with(objective='-loss')
         mock_client.set_generation_strategy.assert_called_once_with(generation_strategy=mock_strategy)
 
     @patch('src.BayesClientManager.ax_helper')
@@ -571,9 +571,9 @@ class TestBayesClientManagerFromClient:
         # Check bounds structure
         for label in manager.feature_labels:
             assert label in manager.bounds
-            assert 'lower' in manager.bounds[label]
-            assert 'upper' in manager.bounds[label]
-            assert 'log' in manager.bounds[label]
+            assert 'lower_bound' in manager.bounds[label]
+            assert 'upper_bound' in manager.bounds[label]
+            assert 'log_scale' in manager.bounds[label]
 
     def test_ackley_client_best_coordinates(self):
         """Test getting best coordinates from Ackley client"""
@@ -585,8 +585,8 @@ class TestBayesClientManagerFromClient:
         
         # Values should be within bounds
         for label, value in best_coords.items():
-            lower = manager.bounds[label]['lower']
-            upper = manager.bounds[label]['upper']
+            lower = manager.bounds[label]['lower_bound']
+            upper = manager.bounds[label]['upper_bound']
             assert lower <= value <= upper
 
     def test_init_from_client_invalid_client(self):
@@ -625,10 +625,10 @@ class TestBayesClientManagerFromClient:
         
         assert manager.feature_labels == ['x1', 'x2']
         assert manager.response_label == 'y'
-        assert manager.bounds['x1']['lower'] == 0.0
-        assert manager.bounds['x1']['upper'] == 1.0
-        assert manager.bounds['x1']['log'] == False
-        assert manager.bounds['x2']['log'] == True
+        assert manager.bounds['x1']['lower_bound'] == 0.0
+        assert manager.bounds['x1']['upper_bound'] == 1.0
+        assert manager.bounds['x1']['log_scale'] == False
+        assert manager.bounds['x2']['log_scale'] == True
 
 
 class TestBayesClientManagerEdgeCases:
@@ -657,8 +657,8 @@ class TestBayesClientManagerEdgeCases:
     def bounds(self):
         """Bounds for testing"""
         return {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
     
     @pytest.fixture
@@ -675,8 +675,8 @@ class TestBayesClientManagerEdgeCases:
         """Test behavior with empty DataFrame"""
         empty_data = pd.DataFrame({'x1': [], 'x2': [], 'y': []})
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=empty_data, 
@@ -698,8 +698,8 @@ class TestBayesClientManagerEdgeCases:
             'y': [np.nan, np.nan, np.nan]
         })
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=all_nan_data, 
@@ -720,8 +720,8 @@ class TestBayesClientManagerEdgeCases:
             'y': [0.7]
         })
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=single_row_data, 
@@ -743,8 +743,8 @@ class TestBayesClientManagerEdgeCases:
             'y': [0.7, 0.8, 0.6]
         })
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=duplicate_data, 
@@ -831,8 +831,8 @@ class TestBayesClientManagerBounds:
     def bounds(self):
         """Bounds for testing"""
         return {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
     
     @pytest.fixture
@@ -860,8 +860,8 @@ class TestBayesClientManagerBounds:
         large_data.loc[np.random.choice(n_samples, 100, replace=False), 'y'] = np.nan
         
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
         manager = BayesClientManager(
             data=large_data, 
@@ -883,8 +883,8 @@ class TestBayesClientManagerBounds:
             'response_var': [0.5, 0.6, 0.7]
         })
         bounds = {
-            'feature_1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'feature-2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'feature_1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'feature-2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
 
         manager = BayesClientManager(
@@ -905,8 +905,8 @@ class TestBayesClientManagerBounds:
             'y': [1e-8, 1e8, 0.5]
         })
         bounds = {
-            'x1': {'lower': 1e-12, 'upper': 1e12, 'log': False}, 
-            'x2': {'lower': 1e-8, 'upper': 1e8, 'log': True}
+            'x1': {'lower_bound': 1e-12, 'upper_bound': 1e12, 'log_scale': False}, 
+            'x2': {'lower_bound': 1e-8, 'upper_bound': 1e8, 'log_scale': True}
         }
 
         manager = BayesClientManager(
@@ -937,8 +937,8 @@ class TestBayesClientManagerBounds:
             'y': [0.8, 0.8, 0.7]  # Two tied best values
         })
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
 
         manager = BayesClientManager(
@@ -960,8 +960,8 @@ class TestBayesClientManagerBounds:
             'y': [0.5, 0.6, 0.7]
         })
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
 
         manager = BayesClientManager(
@@ -984,8 +984,8 @@ class TestBayesClientManagerBounds:
         # Convert string to float explicitly before passing to manager
         mixed_data['y'] = pd.to_numeric(mixed_data['y'], errors='coerce')
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
 
         manager = BayesClientManager(
@@ -1005,8 +1005,8 @@ class TestBayesClientManagerBounds:
             'y': [0.5, 0.6, 0.7]
         })
         bounds = {
-            'x1': {'lower': 0.0, 'upper': 1.0, 'log': False}, 
-            'x2': {'lower': 0.5, 'upper': 1.5, 'log': True}
+            'x1': {'lower_bound': 0.0, 'upper_bound': 1.0, 'log_scale': False}, 
+            'x2': {'lower_bound': 0.5, 'upper_bound': 1.5, 'log_scale': True}
         }
 
         manager = BayesClientManager(

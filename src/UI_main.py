@@ -1,12 +1,12 @@
 from email.headerregistry import Group
 import streamlit as st
 
-from src.ui_start_new_experiment import new_experiment
+from ui.InitExperiment import InitExperiment
 from src.ax_helper import BayesClientManager
 from src.ui_group_manager import GroupManager
 import pickle
 import json
-from UiBayesPlotter import UiBayesPlotter
+from ui.BayesPlotter import UiBayesPlotter
 
 
 class ExperimentInitialiser():
@@ -94,7 +94,7 @@ class ExperimentInitialiser():
             return
         
         if "new_exp" not in st.session_state:
-            st.session_state.new_exp = new_experiment()
+            st.session_state.new_exp = InitExperiment()
         
         exp = st.session_state.new_exp
         exp.create_experiment()
@@ -104,7 +104,7 @@ class ExperimentInitialiser():
             st.divider()
             st.success("✅ Experiment configuration created!")
             if st.button("Finish Setup and Start Experiment", type="primary", use_container_width=True):
-                manager = BayesClientManager(st.session_state.client, exp.gp, exp.acquisition_function)
+                manager = BayesClientManager(st.session_state.client, exp.selected_gp, exp.selected_acquisition_function)
                 st.session_state.bayes_manager = manager
                 st.session_state.experiment_created = True
                 # Clear the initializing flag
