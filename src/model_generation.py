@@ -2,6 +2,7 @@ from operator import inv
 from botorch.models import SingleTaskGP
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
+from numpy import std
 import torch
 
 dtype = torch.float64
@@ -76,11 +77,14 @@ class HeteroWhiteSGP(HeteroNoiseSGP):
 
         if all(n_counts == 1):
             print("Warning: All points have only one repeat. Consider using WhiteNoiseSGP instead.")
-            SingleTaskGP.__init__(self, train_X, train_Y, **kwargs)
+            return SingleTaskGP.__init__(self, train_X, train_Y, **kwargs)
 
-        lower_noise = torch.quantile(std_unique, quintile)
+        if torch.isnan((lower_noise := torch.quantile(std_unique, quintile))):
+            lower_noise = std_unique.abs()[std_unique.abs() > 0].min()
 
-        median_noise = torch.median(std_unique)
+        if torch.isnan((median_noise := torch.median(std_unique))):
+            median_noise = std_unique.abs()[std_unique.abs() > 0].max()
+
         hetero_noise = std_for_X.clamp_min(lower_noise)
 
         # Set noise to median noise for points with only one repeat
@@ -95,4 +99,4 @@ class HeteroWhiteSGP(HeteroNoiseSGP):
         likelihood = FixedNoiseGaussianLikelihood(noise=uncertainty)
 
 
-        SingleTaskGP.__init__(self, train_X, train_Y, likelihood=likelihood, **kwargs)
+        return SingleTaskGP.__init__(self, train_X, train_Y, likelihood=likelihood, **kwargs)

@@ -8,13 +8,14 @@ import streamlit as st
 from botorch.models import SingleTaskGP
 import plotly.express as px
 
+
 class BayesPlotter:
     def __init__(self, bayes_manager: BayesClientManager):
         self.bayes_manager = bayes_manager
-   
 
     def check_plot_ready(passed_function):
         """Decorator to ensure the bayes_manager is synced and has response data before plotting"""
+
         def _inner_function(self, *args, **kwargs):
             self.bayes_manager.sync_self()
             if self.bayes_manager.has_response:
@@ -22,6 +23,7 @@ class BayesPlotter:
             else:
                 st.warning("No data available for plotting.")
                 return None
+
         return _inner_function
 
     @check_plot_ready
@@ -78,15 +80,10 @@ class BayesPlotter:
 
         with columns[0]:
             self._set_to_best_performer()
-            if st.button(
-                "Plot Gaussian Process", key="plot_the_coords", type="primary"
-            ):
-                self.plot_gaussian_process(
-                    gp_model=SingleTaskGP, coords=self.plot_coords
-                )
+            button = st.button("Plot Gaussian Process", key="plot_the_coords", type="primary")
 
-
-
+        if button:
+            self.plot_gaussian_process(gp_model=SingleTaskGP, coords=self.plot_coords)
 
     @check_plot_ready
     def _choose_group_for_coords(self):
@@ -130,6 +127,7 @@ class BayesPlotter:
                             st.caption(
                                 f"Group {selected_group}: No response data available"
                             )
+
     @check_plot_ready
     def look_coords_slider(self):
         """Create sliders for each parameter to set look coordinates"""
@@ -232,6 +230,8 @@ class BayesPlotter:
         plotter = GPVisualiserPlotly(self.bayes_manager)
 
         fig, ax = plotter.plot_all(coordinates=coords)
+        fig.update_layout(title=None)
+        st.write(f"### Gaussian Process Visualization at ({', '.join(map(str, coords))})")
         st.plotly_chart(
             fig,
             use_container_width=True,
@@ -246,7 +246,6 @@ class BayesPlotter:
     @check_plot_ready
     def plot_group_performance(self):
         """Performance of each observation group as box plot"""
-        
 
         if not self.bayes_manager.has_response:
             st.warning("No data available to plot.")

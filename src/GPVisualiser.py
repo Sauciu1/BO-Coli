@@ -18,14 +18,9 @@ from plotly.subplots import make_subplots
 from src.BayesClientManager import BayesClientManager
 
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Default dtype for the visualiser tensors - keep high precision by default
 dtype = torch.float64
-
-
-
-
 
 def subplot_dims(n) -> tuple[int, int]:
     """Get grid dimensions for plotting based on number of results."""
@@ -35,6 +30,8 @@ def subplot_dims(n) -> tuple[int, int]:
 
 class GPVisualiser:
     def __init__(self, bayes_manager: BayesClientManager) -> None:
+        if hasattr(bayes_manager, 'sync_self'):
+            bayes_manager.sync_self()
         self.bayes_manager = bayes_manager
         self.response_label = bayes_manager.response_label
         self.feature_labels = bayes_manager.feature_labels
