@@ -36,24 +36,20 @@ class ExperimentInitialiser:
         uploaded_file = st.file_uploader("Upload saved experiment file", type=["pkl"])
         if uploaded_file is not None:
             try:
-                # Reset file pointer to beginning
+
                 uploaded_file.seek(0)
+
+                manager = BayesClientManager.init_self_from_pickle(uploaded_file)
                 
-                # Use custom unpickler to handle module path issues
-                unpickler = CompatibleUnpickler(uploaded_file)
-                loaded_obj = unpickler.load()
+                if not isinstance(manager, BayesClientManager):
+                    raise ValueError("The loaded object is not a BayesClientManager instance.")
                 
-                # Check if it's a BayesClientManager (allow different module paths)
-                if (isinstance(loaded_obj, BayesClientManager) or 
-                    hasattr(loaded_obj, '__class__') and 
-                    loaded_obj.__class__.__name__ == 'BayesClientManager'):
-                    
-                    st.session_state.bayes_manager = loaded_obj
-                    st.session_state.experiment_created = True
-                    st.success("✅ Experiment file loaded successfully!")
-                    st.rerun()
-                else:
-                    st.warning("⚠️ Invalid file: Expected BayesClientManager object.")
+                # Store in session state
+                st.session_state.bayes_manager = manager
+                st.session_state.experiment_created = True
+                st.success("✅ Experiment loaded successfully!")
+                st.rerun()
+
             except (pickle.UnpicklingError, AttributeError, ModuleNotFoundError) as e:
                 st.error(f"❌ Pickle file error: {e}")
             except Exception as e:
@@ -86,6 +82,8 @@ class ExperimentInitialiser:
 class main_manager:
     def __init__(self):
         self.loader = ExperimentInitialiser()
+
+    
 
     def main_loop(self):
         if not st.session_state.get("experiment_created", False):

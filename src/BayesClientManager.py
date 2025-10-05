@@ -84,6 +84,9 @@ class BayesClientManager:
         if self.id_label not in data.columns:
             generate_id_labels(data)
 
+        # Convert group column to int, handling NaN values
+        data[self.group_label] = pd.to_numeric(data[self.group_label], errors='coerce').fillna(0).astype(int)
+
         return data
 
     def _preprocess_bounds(self, bounds: dict):
@@ -305,25 +308,53 @@ class BayesClientManager:
 
     def get_batch_targets(self, n_targets: int):
         """Get next batch of target points from the client"""
-        # Store existing response data to preserve it
-        existing_responses = self.data[[self.id_label, self.response_label]].copy()
+        # Store original data count to identify new trials
+        original_count = len(self.data)
         
         client = self.load_data_to_client()
         client.get_next_trials(max_trials=n_targets)
 
-        # Get the updated data from client
-        new_data = self.retrieve_data_from_client(client)
+        # Get the updated data from client (this includes new targets)
+        raw_new_data = self.retrieve_data_from_client(client)
         
-        for idx, row in new_data.iterrows():
-            row_id = row[self.id_label]
-            existing_row = existing_responses[existing_responses[self.id_label] == row_id]
+        # The problem is that retrieve_data_from_client generates new unique IDs
+        # We need to preserve the original unique IDs and only generate IDs for truly new trials
+        
+        # Match existing data by unique_id to preserve individual trial responses
+        # Create a mapping of parameter combinations to original data for proper matching
+        combined_data = []
+        
+        # Create a list to track which original rows have been matched
+        original_data_used = set()
+        
+        for idx, new_row in raw_new_data.iterrows():
+            # Try to find matching row in original data by parameters
+            matching_mask = True
+            for param in self.feature_labels:
+                matching_mask &= (self.data[param] == new_row[param])
             
-            if not existing_row.empty:
-                existing_response = existing_row.iloc[0][self.response_label]
-                if not pd.isna(existing_response):
-                    new_data.loc[idx, self.response_label] = existing_response
+            existing_matches = self.data[matching_mask]
+            
+            # Find an unused matching row (to avoid duplicating responses)
+            matched_row = None
+            for _, existing_row in existing_matches.iterrows():
+                row_index = existing_row.name
+                if row_index not in original_data_used:
+                    matched_row = existing_row.copy()
+                    original_data_used.add(row_index)
+                    # Update group if it changed
+                    matched_row[self.group_label] = new_row[self.group_label]
+                    break
+            
+            if matched_row is not None:
+                # Use existing row data (preserves unique_id and response)
+                combined_data.append(matched_row)
+            else:
+                # This is a new trial - keep the new unique_id and NaN response
+                combined_data.append(new_row)
         
-        self.data = new_data
+        # Convert back to DataFrame
+        self.data = pd.DataFrame(combined_data).reset_index(drop=True)
         return self.data
 
     def complete_trial_by_id(self, unique_id, response_value):
@@ -394,15 +425,9 @@ class BayesClientManager:
         return {label: self.data[self.data[self.group_label] == label] for label in self.current_group_labels}
     
     @staticmethod
-    def init_self_from_pickle(file_path: str):
+    def init_self_from_pickle(file:bytes):
         """Initialize BayesClientManager from a pickle file, handling module path changes."""
-        with open(file_path, "rb") as f:
-            unpickler = CompatibleUnpickler(f)
-            manager = unpickler.load()
-        
-        if not isinstance(manager, BayesClientManager):
-            raise ValueError("The loaded object is not a BayesClientManager instance.")
-        return manager
+        return CompatibleUnpickler(file).load()
     
 
 import pickle

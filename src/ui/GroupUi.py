@@ -147,8 +147,12 @@ class GroupUi:
             if target_button := st.button("Get New Targets", disabled=False):
                 with st.spinner("Generating targets..."):
                     try:
+                        # First, sync all current groups to manager to preserve any unsaved changes
+                        self.sync_all_groups_to_manager()
+                        
                         # Get new targets from BayesClientManager
                         self.bayes_manager.get_batch_targets(batch_size)
+                        
                         # Clear cached groups to force refresh with new data
                         st.session_state.groups = {}
                         st.rerun(scope='fragment')
