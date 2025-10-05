@@ -182,8 +182,6 @@ class main_manager:
 
 
 if __name__ == "__main__":
-    if '--server.port' not in sys.argv:
-        sys.argv.extend(['--server.port', '8989'])
 
     st.set_page_config(
             page_title="BoColi Bayesian Optimization for Biological Systems",
