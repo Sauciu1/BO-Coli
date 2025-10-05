@@ -14,7 +14,7 @@ import pathlib
 
 class ExperimentInitialiser:
     def _init_or_load_exp(self):
-        st.title("BO-Coli: Bayesian Optimization for Biological Systems")
+       
         if st.session_state.get("initializing_experiment", False):
             return self._init_experiment()
 
@@ -84,6 +84,7 @@ class main_manager:
 
     def main_loop(self):
         """Handles the main UI loop for experiment management"""
+        st.title("BO-Coli: Bayesian Optimization for Biological Systems")
         if not st.session_state.get("experiment_created", False):
             self.loader._init_or_load_exp()
         else:
@@ -91,6 +92,7 @@ class main_manager:
             BayesPlotter(self.bayes_manager).main_loop()
 
             st.divider()
+            self._download_experiment()
 
         self.write_footnote()
 
@@ -121,44 +123,57 @@ class main_manager:
         self.group_manager.sync_all_groups_to_manager()
   
     def _download_experiment(self):
-        try:
-            # Function to prepare download data with sync
-            def prepare_download_data():
-                # Sync all groups to manager when download is requested
-                self.group_manager.sync_all_groups_to_manager()
-                return pickle.dumps(self.group_manager.bayes_manager)
 
-            current_time = time.strftime("%Y%m%d_%H%M")
+        # Function to prepare download data with sync
+        def prepare_download_data():
+            # Sync all groups to manager when download is requested
+            self.group_manager.sync_all_groups_to_manager()
+            return pickle.dumps(self.group_manager.bayes_manager)
 
-            # Direct download button with on-demand data preparation
-            st.download_button(
-                label="💾 Download Experiment Data",
-                data=prepare_download_data(),
-                file_name=f"bo_coli_{self.bayes_manager.experiment_name}_{current_time}.pkl",
-                mime="application/octet-stream",
-                help="Download the complete experiment as a pickle file",
-            )
+        current_time = time.strftime("%Y%m%d_%H%M")
 
-            def prepare_csv_data():
-                self.group_manager.sync_all_groups_to_manager()
-                df = self.group_manager.bayes_manager.data
-                return df.to_csv(index=False).encode("utf-8")
+        # Direct download button with on-demand data preparation
+        st.download_button(
+            label="💾 Download Experiment Data",
+            data=prepare_download_data(),
+            file_name=f"bo_coli_{self.bayes_manager.experiment_name}_{current_time}.pkl",
+            mime="application/octet-stream",
+            help="Download the complete experiment as a pickle file",
+        )
 
-            st.download_button(
-                label="𝄜 Download as .csv (CANNOT BE REUPLOADED)",
-                data=prepare_csv_data(),
-                file_name=f"bo_coli_{self.bayes_manager.experiment_name}_{current_time}.csv",
-                mime="text/csv",
-            )
+        def prepare_csv_data():
+            self.group_manager.sync_all_groups_to_manager()
+            df = self.group_manager.bayes_manager.data
+            return df.to_csv(index=False).encode("utf-8")
 
-        except Exception as e:
-            st.error(f"❌ Error preparing download: {e}")
+        st.download_button(
+            label="𝄜 Download as .csv (CANNOT BE REUPLOADED)",
+            data=prepare_csv_data(),
+            file_name=f"bo_coli_{self.bayes_manager.experiment_name}_{current_time}.csv",
+            mime="text/csv",
+        )
+
 
 
     def write_footnote(self):
-        footnote_path = r"src\ui\footnote.md"
-        with open(footnote_path, "r", encoding="utf-8") as f:
-            text = f.read()
+        # Resolve the footnote path relative to this source file. This avoids
+        # relying on the current working directory, which can differ (e.g. in
+        # Docker or when running from another folder).
+        footnote_path = pathlib.Path(__file__).resolve().parent / "footnote.md"
+
+        text = None
+        try:
+            with open(footnote_path, "r", encoding="utf-8") as f:
+                text = f.read()
+        except FileNotFoundError:
+            # Graceful fallback if the file isn't present in the runtime image.
+            text = (
+                "**About this app**\n\n"
+                "This application displays Bayesian optimization experiments. "
+                "(footnote.md not found in the deployment)."
+            )
+        except Exception as e:
+            text = f"Could not load app information: {e}"
 
         with st.expander("ℹ️ About this App", expanded=False):
             st.markdown(text)

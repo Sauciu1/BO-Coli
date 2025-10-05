@@ -24,15 +24,18 @@ You bo-coli venv should now appear, run everything from it.
 
 
 ##
-To deploy BOcoli with docker:
+To deploy BOcoli with docker installed on system:
 ```powershell
-docker build -t bo_coli:v6 .
-docker run -p 8989:8989 bo_coli:v6
+git clone https://github.com/Sauciu1/BO-Coli
+docker build -t bo_coli:v7 .
+
 
 ```
 
-You can now connect to the app via your browser window at:
+This will take a few minutes to compile, afterwards you can access the via your browser via.
+
 
 ```
+docker run -p 8989:8989 bo_coli:v7
 http://localhost:8989/
 ```
