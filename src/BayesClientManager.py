@@ -234,22 +234,24 @@ class BayesClientManager:
             .reset_index()
         )
 
-    def get_best_coordinates(self):
-        """Get the coordinates of the best-performing observation"""
+
+
+    def get_best_group(self):
+        """Get the group label of the best-performing observation"""
         if self.agg_stats.empty:
             return None
         if self.objective_direction == "minimise":
             best_idx = self.agg_stats["mean"].idxmin()
         else:
             best_idx = self.agg_stats["mean"].idxmax()
-        return self.agg_stats.loc[best_idx, self.feature_labels].to_dict()
-
-    def get_best_group(self):
-        """Get the group label of the best-performing observation"""
-        if self.agg_stats.empty:
-            return None
-        best_idx = self.agg_stats["mean"].idxmax()
         return self.agg_stats.loc[best_idx, self.group_label]
+
+    def get_group_coords(self, group_label:int):
+        """Get the coordinates for a given group label"""
+        group_data = self.data[self.data[self.group_label] == group_label]
+        if group_data.empty:
+            return None
+        return group_data[self.feature_labels].iloc[0].to_dict()
 
     def _create_ax_client(self):
         client = Client()

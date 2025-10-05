@@ -1,5 +1,7 @@
 import json
 
+from pandas.io.formats import style
+
 from src.GPVisualiser import GPVisualiserPlotly
 from src.model_generation import HeteroWhiteSGP
 from src.BayesClientManager import BayesClientManager
@@ -12,6 +14,8 @@ import plotly.express as px
 class BayesPlotter:
     def __init__(self, bayes_manager: BayesClientManager):
         self.bayes_manager = bayes_manager
+
+    # ...removed helper to keep control logic minimal and inline where used...
 
     def check_plot_ready(passed_function):
         """Decorator to ensure the bayes_manager is synced and has response data before plotting"""
@@ -30,25 +34,43 @@ class BayesPlotter:
     def _set_to_best_performer(self):
         if st.button("Set to Best Performer", key="set_best_performer"):
             # Use BayesClientManager to get best coordinates and group
-            best_coords = self.bayes_manager.get_best_coordinates()
             best_group = self.bayes_manager.get_best_group()
+            best_coords = self.bayes_manager.get_group_coords(best_group)
 
-            if best_coords is not None and best_group is not None:
-                # Cache the results for performance
-                if "best_coords_cache" not in st.session_state:
-                    st.session_state["best_coords_cache"] = {}
+            if best_coords is None:
+                return
 
+            # Cache the results for performance
+            if "best_coords_cache" not in st.session_state:
+                st.session_state["best_coords_cache"] = {}
+
+            cache_key = f"{len(self.bayes_manager.data)}_{hash(str(self.bayes_manager.data[self.bayes_manager.response_label].values.tobytes()))}"
+            st.session_state["best_coords_cache"][cache_key] = {
+                "coords": best_coords,
+                "group": best_group,
+            }
+
+            # Inline minimal selection handling: set target coords, index and request rerun
+            groups = self.bayes_manager.get_groups()
+            if best_group in groups and not groups[best_group].empty:
+                group_coords = groups[best_group][self.bayes_manager.feature_labels].iloc[0].to_dict()
+                st.session_state.setdefault("best_coords_cache", {})
                 cache_key = f"{len(self.bayes_manager.data)}_{hash(str(self.bayes_manager.data[self.bayes_manager.response_label].values.tobytes()))}"
-                st.session_state["best_coords_cache"][cache_key] = {
-                    "coords": best_coords,
-                    "group": best_group,
-                }
+                st.session_state["best_coords_cache"][cache_key] = {"coords": group_coords, "group": best_group}
 
-                if "group_selector" not in st.session_state:
-                    st.session_state["group_selector"] = str(best_group)
-                self._set_group_coords(best_group)
+                available_groups = self.bayes_manager.current_group_labels
+                options = [""] + [str(g) for g in available_groups]
+                try:
+                    idx = options.index(str(best_group))
+                except ValueError:
+                    idx = 0
+                st.session_state.setdefault("group_selector_index", 0)
+                st.session_state["group_selector_index"] = idx
+                st.session_state["target_coords"] = group_coords
+                st.session_state["reset_to_group"] = True
+                st.session_state["group_selector"] = str(best_group)
                 st.session_state["pending_rerun"] = True
-                st.rerun(scope="fragment")
+                st.rerun()
 
     @check_plot_ready
     def _set_group_coords(self, group_name):
@@ -71,16 +93,16 @@ class BayesPlotter:
 
         columns = st.columns([0.3, 0.3, 0.5])
 
-        with columns[1]:
+        # Render the best-performer button in the left column BEFORE the selectbox is created
+        with columns[0]:
+            self._set_to_best_performer()
+            button = st.button("Plot Gaussian Process", key="plot_the_coords", type="primary")
 
+        with columns[1]:
             self._choose_group_for_coords()
 
         with columns[2]:
             self.look_coords_slider()
-
-        with columns[0]:
-            self._set_to_best_performer()
-            button = st.button("Plot Gaussian Process", key="plot_the_coords", type="primary")
 
         if button:
             self.plot_gaussian_process(gp_model=SingleTaskGP, coords=self.plot_coords)
@@ -93,17 +115,30 @@ class BayesPlotter:
             options = [""] + [str(g) for g in available_groups]
             default_index = 0
 
+            # Prepare index in session state
+            st.session_state.setdefault("group_selector_index", 0)
+
             def group_select_callback():
                 # Handle group selection when user manually changes the dropdown
                 selected_group = st.session_state.get("group_selector", "")
                 if selected_group and selected_group != "":
-                    self._set_group_coords(int(selected_group))
-                    st.session_state["pending_rerun"] = True
+                    try:
+                        sg = int(selected_group)
+                    except ValueError:
+                        return
 
+                    groups = self.bayes_manager.get_groups()
+                    if sg in groups and not groups[sg].empty:
+                        group_coords = groups[sg][self.bayes_manager.feature_labels].iloc[0].to_dict()
+                        st.session_state["target_coords"] = group_coords
+                        st.session_state["reset_to_group"] = True
+                        st.session_state["pending_rerun"] = True
+
+            # Render selectbox using options and index from session state
             selected_group = st.selectbox(
-                "Select Observation Group:",
+                label="Select Observation Group:",
                 options=options,
-                index=default_index,
+                index=st.session_state.get("group_selector_index", 0),
                 key="group_selector",
                 help="Choose a group to set coordinates to that group's values",
                 on_change=group_select_callback,
@@ -152,7 +187,7 @@ class BayesPlotter:
 
         # Cache default values to avoid expensive recomputation
         if "default_coords_cache" not in st.session_state:
-            best_coords = self.bayes_manager.get_best_coordinates()
+            best_coords = self.bayes_manager.get_group_coords(self.bayes_manager.get_best_group())
             st.session_state["default_coords_cache"] = (
                 best_coords if best_coords is not None else {}
             )
@@ -231,7 +266,10 @@ class BayesPlotter:
 
         fig, ax = plotter.plot_all(coordinates=coords)
         fig.update_layout(title=None)
-        st.write(f"### Gaussian Process Visualization at ({', '.join(map(str, coords))})")
+
+        st.write(f"### Gaussian Process Visualization at parameters({', '.join(map(str, coords))})")
+        st.write("**GP visualization is shown as parallel to an axis**. " \
+        "Elements farther from the plane are smaller in size.")
         st.plotly_chart(
             fig,
             use_container_width=True,
@@ -280,7 +318,7 @@ class BayesPlotter:
 
     @st.fragment
     def main_loop(self):
-        if st.button("Reload Data for Plotting", key="reload_data_plot"):
+        if st.button("Reload Data for Plotting", key="reload_data_plot", type="primary"):
             self.bayes_manager.sync_self()
             st.rerun(scope="fragment")
         with st.expander("📈 Plot Group Performance", expanded=True):

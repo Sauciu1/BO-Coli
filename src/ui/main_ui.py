@@ -14,6 +14,7 @@ import pathlib
 
 class ExperimentInitialiser:
     def _init_or_load_exp(self):
+        st.title("BO-Coli: Bayesian Optimization for Biological Systems")
         if st.session_state.get("initializing_experiment", False):
             return self._init_experiment()
 
