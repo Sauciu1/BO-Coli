@@ -327,6 +327,10 @@ class BayesClientManager:
         # Create a list to track which original rows have been matched
         original_data_used = set()
         
+        # Get the next available group number for new trials
+        max_existing_group = self.data[self.group_label].max() if len(self.data) > 0 else -1
+        next_group_number = max_existing_group + 1
+        
         for idx, new_row in raw_new_data.iterrows():
             # Try to find matching row in original data by parameters
             matching_mask = True
@@ -342,15 +346,16 @@ class BayesClientManager:
                 if row_index not in original_data_used:
                     matched_row = existing_row.copy()
                     original_data_used.add(row_index)
-                    # Update group if it changed
-                    matched_row[self.group_label] = new_row[self.group_label]
+                    # Keep the original group label - don't overwrite it
                     break
             
             if matched_row is not None:
-                # Use existing row data (preserves unique_id and response)
+                # Use existing row data (preserves unique_id, response, and group)
                 combined_data.append(matched_row)
             else:
-                # This is a new trial - keep the new unique_id and NaN response
+                # This is a new trial - assign next available group number
+                new_row[self.group_label] = next_group_number
+                next_group_number += 1
                 combined_data.append(new_row)
         
         # Convert back to DataFrame

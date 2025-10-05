@@ -128,15 +128,15 @@ class main_manager:
         
 
     
-       
 
 if __name__ == "__main__":
+    
+    st.set_page_config(
+        page_title="Bayesian Optimization for Biological Systems",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
     if "manager" not in st.session_state:
-        st.set_page_config(
-            page_title="Bayesian Optimization for Biological Systems",
-            layout="wide",
-            initial_sidebar_state="collapsed",
-        )
         st.session_state.manager = main_manager()
     
     st.session_state.manager.main_loop()
