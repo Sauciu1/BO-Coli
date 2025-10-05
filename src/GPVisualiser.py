@@ -1,11 +1,8 @@
 # Created by Povilas (GitHub: Sauciu1) on 2025-09-15
-# last updated on 2025-09-15 by Povilas
+# last updated on 2025-10-05 by Povilas - Refactored for better integration with BayesPlotter
 
 
 from ax import Client
-
-from ax.plot import render
-
 import pandas as pd
 import torch
 from torch import Tensor
@@ -15,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import FunctionTransformer
 import tempfile, webbrowser, plotly.io as pio
-from src.ax_helper import  UnitCubeScaler
+from src.ax_helper import UnitCubeScaler
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from src.BayesClientManager import BayesClientManager
@@ -37,49 +34,44 @@ def subplot_dims(n) -> tuple[int, int]:
 
 
 class GPVisualiser:
-    def __init__(
-        self,
-        bayes_manager: BayesClientManager,
-    ) -> None:
-
-
-
+    def __init__(self, bayes_manager: BayesClientManager) -> None:
         self.bayes_manager = bayes_manager
         self.response_label = bayes_manager.response_label
         self.feature_labels = bayes_manager.feature_labels
-        feature_range_params= bayes_manager._ax_parameters
-
-        gp = self.bayes_manager.gp
-
-
+        self.group_label = bayes_manager.group_label
         
+        # Setup scaler
+        feature_range_params = bayes_manager._ax_parameters
         if feature_range_params is not None:
             self.scaler = UnitCubeScaler(ax_parameters=feature_range_params)
             self.scaler.set_output(transform="pandas")
         else:
             self.scaler = FunctionTransformer(lambda x: x, validate=False)
 
-
-        self.gp = self._train_gp(gp)
+        # Train GP model
+        self.gp = self._train_gp(self.bayes_manager.gp)
         self.subplot_dims = subplot_dims(self.obs_X.shape[1])
-
         self.fig = None
 
     @property
     def get_obs_X_y(self):
+        """Get observed and predicted data separated by NA values."""
         obs = self.bayes_manager.data
         mask_na = obs[[self.response_label] + self.feature_labels].isna().any(axis=1)
 
         self.predict_X = obs.loc[mask_na, self.feature_labels]
         self.predict_y = obs.loc[mask_na, self.response_label]
+        self.predict_groups = obs.loc[mask_na, self.group_label] if self.group_label in obs.columns else None
         
         self.obs_X = obs.loc[~mask_na, self.feature_labels]
         self.obs_y = obs.loc[~mask_na, self.response_label]
+        self.obs_groups = obs.loc[~mask_na, self.group_label] if self.group_label in obs.columns else None
         return self.obs_X, self.obs_y
     
     @property
     def obs_X_vals(self):
         return self.get_obs_X_y[0].values
+    
     @property
     def obs_y_vals(self):
         return self.get_obs_X_y[1].values
@@ -158,7 +150,11 @@ class GPVisualiser:
         return torch.dist(point1, point2).item()
     
     def get_best_observed_coord(self) -> pd.Series:
-        """Get the coordinates of the best observed point."""
+        """Get the coordinates of the best observed point using BayesClientManager."""
+        best_coords = self.bayes_manager.get_best_coordinates()
+        if best_coords is not None:
+            return pd.Series(best_coords)
+        # Fallback to local calculation
         best_idx = self.obs_y.idxmax()
         return self.obs_X.loc[best_idx]
 
@@ -272,27 +268,28 @@ class GPVisualiserMatplotlib(GPVisualiser):
     def _plot_expected_improvement(self, ax, x, mean, std, sizes):
         if len(x) == 0:
             return
-        elif len(x)==1:
+        elif len(x) == 1:
             x, mean, std, sizes = [x], [mean], [std], [sizes]
-       # group_labels = 
 
+        # Get group labels for predicted points if available
+        group_labels = self.predict_groups.values if self.predict_groups is not None else [None] * len(x)
 
-        # Plot each predicted point as a separate error bar
-        for xi, mi, si, sz in zip(x, mean, std, sizes):
+        # Plot each predicted point as a separate error bar with group info
+        for xi, mi, si, sz, group in zip(x, mean, std, sizes, group_labels):
+            group_text = f"G{int(group)}" if group is not None else "Unknown"
             ax.errorbar(
                 xi,
                 mi,
                 yerr=2 * si,
                 fmt='',
                 color='red',
-    
                 alpha=0.3,
-                linewidth=sz * 1+0.1,
-                capsize=sz * 1+0.1,
+                linewidth=sz * 1 + 0.1,
+                capsize=sz * 1 + 0.1,
                 label='Predicted observation',
                 picker=True,
-                gid=f"Group: Predicted observation | x={float(xi):.3g}, y={float(mi):.3g}"
-                )
+                gid=f"Group: {group_text} | x={float(xi):.3g}, y={float(mi):.3g}"
+            )
 
 
     @staticmethod
@@ -347,18 +344,18 @@ class GPVisualiserMatplotlib(GPVisualiser):
         dim_name: str,
         coordinates,
     ) -> None:
-        """Plot observed data points along a single dimension."""
+        """Plot observed data points along a single dimension with group information."""
         dim = self.obs_X.columns.get_loc(dim_name)
         point_size = self._get_size(self.obs_X, coordinates, dim)
 
-        sns.scatterplot(
-            x=self.obs_X[dim_name],
-            y=self.obs_y,
+        # Create scatter plot with default colors (no group-based coloring)
+        ax.scatter(
+            self.obs_X[dim_name],
+            self.obs_y,
             s=point_size*100+1,
-            ax=ax,
-            label="Observations",
             edgecolor="k",
             alpha=0.7,
+            label="Observations"
         )
 
         ax.set_title(f"GP along {dim_name}")
@@ -380,7 +377,7 @@ class GPVisualiserPlotly(GPVisualiser):
     def _plot_expected_improvement(self, ax, x, mean, std, sizes):
         if len(x) == 0:
             return
-        elif len(x)==1:
+        elif len(x) == 1:
             x, mean, std, sizes = [x.item()], [mean.item()], [std.item()], [sizes.item()]
         else:
             # Convert tensors to numpy/python types
@@ -389,8 +386,14 @@ class GPVisualiserPlotly(GPVisualiser):
             std = std.cpu().numpy() if hasattr(std, 'cpu') else std
             sizes = sizes.cpu().numpy() if hasattr(sizes, 'cpu') else sizes
 
-        # Plot each predicted point as a separate error bar
-        for xi, mi, si, sz in zip(x, mean, std, sizes):
+        # Get group labels for predicted points
+        group_labels = self.predict_groups.values if self.predict_groups is not None else [None] * len(x)
+
+        # Plot each predicted point as a separate error bar with group info
+        for xi, mi, si, sz, group in zip(x, mean, std, sizes, group_labels):
+            group_text = f"G{int(group)}" if group is not None else "Unknown"
+            hover_text = f"Predicted Group {group_text}<br>x: {float(xi):.3g}<br>y: {float(mi):.3g}±{float(2*si):.3g}"
+            
             # Error bar line
             ax.fig.add_trace(
                 go.Scatter(
@@ -401,7 +404,9 @@ class GPVisualiserPlotly(GPVisualiser):
                               width=float(sz * 10 + 5)),
                     opacity=0.3,
                     showlegend=False,
-                    name='Predicted (selected point)'
+                    name='Predicted (selected point)',
+                    hovertext=hover_text,
+                    hoverinfo='text'
                 ),
                 row=ax.row, col=ax.col
             )
@@ -509,7 +514,7 @@ class GPVisualiserPlotly(GPVisualiser):
                 seen_names.add(trace.name)
 
     def _plot_observations(self, ax, dim_name: str, coordinates):
-        """Plot observed data points along a single dimension."""
+        """Plot observed data points along a single dimension with group information."""
         dim = self.obs_X.columns.get_loc(dim_name)
         point_size = self._get_size(self.obs_X, coordinates, dim)
         
@@ -519,6 +524,19 @@ class GPVisualiserPlotly(GPVisualiser):
         elif hasattr(point_size, 'numpy'):
             point_size = point_size.numpy()
         
+        # Prepare hover text with group information but use default colors
+        if self.obs_groups is not None:
+            hover_text = [f"Group {int(g)}<br>x: {x:.3g}<br>y: {y:.3g}" 
+                         for x, y, g in zip(self.obs_X[dim_name].values, 
+                                          self.obs_y.values, 
+                                          self.obs_groups.values)]
+        else:
+            hover_text = [f"x: {x:.3g}<br>y: {y:.3g}" 
+                         for x, y in zip(self.obs_X[dim_name].values, self.obs_y.values)]
+        
+        # Use default orange color for all observations
+        colors = 'orange'
+        
         ax.fig.add_trace(
             go.Scatter(
                 x=self.obs_X[dim_name].values,
@@ -526,10 +544,12 @@ class GPVisualiserPlotly(GPVisualiser):
                 mode='markers',
                 marker=dict(
                     size=[float(s * 20 + 5) for s in point_size],
-                    color='orange',
+                    color=colors,
                     line=dict(width=1, color='black'),
                     opacity=0.7
                 ),
+                hovertext=hover_text,
+                hoverinfo='text',
                 name='Observations',
                 showlegend=False
             ),
@@ -608,3 +628,4 @@ if __name__ == "__main__":
     with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as _f:
         _f.write(_html)
     webbrowser.open("file://" + _f.name)
+    print("done")

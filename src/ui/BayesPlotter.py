@@ -15,45 +15,38 @@ class UiBayesPlotter:
 
     def _set_to_best_performer(self):
         if st.button("Set to Best Performer", key="set_best_performer"):
-            # Get the best group and simulate user selection
-            if "best_coords_cache" not in st.session_state:
-                st.session_state["best_coords_cache"] = {}
+            # Use BayesClientManager to get best coordinates and group
+            best_coords = self.bayes_manager.get_best_coordinates()
+            best_group = self.bayes_manager.get_best_group()
 
-            cache_key = f"{len(self.bayes_manager.data)}_{hash(str(self.bayes_manager.data[self.bayes_manager.response_label].values.tobytes()))}"
-
-            if cache_key not in st.session_state["best_coords_cache"]:
-                defaults = self.bayes_manager.get_best_coordinates()
-                best_group = self.bayes_manager.get_best_group()
+            if best_coords is not None and best_group is not None:
+                # Cache the results for performance
+                if "best_coords_cache" not in st.session_state:
+                    st.session_state["best_coords_cache"] = {}
+                
+                cache_key = f"{len(self.bayes_manager.data)}_{hash(str(self.bayes_manager.data[self.bayes_manager.response_label].values.tobytes()))}"
                 st.session_state["best_coords_cache"][cache_key] = {
-                    "coords": defaults,
+                    "coords": best_coords,
                     "group": best_group,
                 }
-            else:
-                cached = st.session_state["best_coords_cache"][cache_key]
-                best_group = cached["group"]
 
-            # Simulate user selecting the best group in the dropdown
-            if best_group is not None:
+                # Set UI state
                 st.session_state["group_selector"] = str(best_group)
-                # Trigger the same actions as if user selected it
                 self._set_group_coords(best_group)
                 st.session_state["pending_rerun"] = True
-
-            st.rerun(scope="fragment")
+                st.rerun(scope="fragment")
 
     def _set_group_coords(self, group_name):
-        """Set coordinates to a specific group's values"""
-        group_data = self.bayes_manager.data[
-            self.bayes_manager.data[self.bayes_manager.group_label] == group_name
-        ]
-        if not group_data.empty:
-            # Get the first row of the group (or you could use mean/median)
-            group_coords = (
-                group_data[self.bayes_manager.feature_labels].iloc[0].to_dict()
-            )
-            # Store the coordinates to be used as slider defaults
-            st.session_state["reset_to_group"] = True
-            st.session_state["target_coords"] = group_coords
+        """Set coordinates to a specific group's values using BayesClientManager."""
+        groups_dict = self.bayes_manager.get_groups()
+        if group_name in groups_dict:
+            group_data = groups_dict[group_name]
+            if not group_data.empty:
+                # Get the first row of the group for coordinates
+                group_coords = group_data[self.bayes_manager.feature_labels].iloc[0].to_dict()
+                # Store the coordinates to be used as slider defaults
+                st.session_state["reset_to_group"] = True
+                st.session_state["target_coords"] = group_coords
 
     @st.fragment
     def choose_plot_coordinates(self):
@@ -95,12 +88,9 @@ class UiBayesPlotter:
 
     def _choose_group_for_coords(self):
         if self.bayes_manager.has_response and self.bayes_manager.group_label:
-            available_groups = sorted(
-                self.bayes_manager.data[self.bayes_manager.group_label].unique()
-            )
-
-            # Calculate the correct index for default selection
-            options = [""] + list(available_groups)
+            # Use BayesClientManager to get available groups
+            available_groups = self.bayes_manager.current_group_labels
+            options = [""] + [str(g) for g in available_groups]
             default_index = 0
 
             def group_select_callback():
@@ -119,24 +109,18 @@ class UiBayesPlotter:
                 on_change=group_select_callback,
             )
 
-            # Display group mean response when a group is selected
+            # Display group statistics when a group is selected
             if selected_group and selected_group != "":
-                group_data = self.bayes_manager.data[
-                    self.bayes_manager.data[self.bayes_manager.group_label]
-                    == int(selected_group)
-                ]
-                if not group_data.empty:
-                    mean_response = group_data[
-                        self.bayes_manager.response_label
-                    ].mean()
-                    if pd.notna(mean_response):
-                        st.caption(
-                            f"Group {selected_group} mean response: **{mean_response:.4f}**"
-                        )
-                    else:
-                        st.caption(
-                            f"Group {selected_group}: No response data available"
-                        )
+                groups_dict = self.bayes_manager.get_groups()
+                group_id = int(selected_group)
+                if group_id in groups_dict:
+                    group_data = groups_dict[group_id]
+                    if not group_data.empty:
+                        mean_response = group_data[self.bayes_manager.response_label].mean()
+                        if pd.notna(mean_response):
+                            st.caption(f"Group {selected_group} mean response: **{mean_response:.4f}**")
+                        else:
+                            st.caption(f"Group {selected_group}: No response data available")
 
     def look_coords_slider(self):
         """Create sliders for each parameter to set look coordinates"""
@@ -204,15 +188,21 @@ class UiBayesPlotter:
 
     @property
     def plot_coords(self):
-        # Get current slider values directly from session state
+        """Get current plotting coordinates from sliders or bayes_manager."""
         coords = []
         for param in self.bayes_manager.feature_labels:
             slider_key = f"slider_{param}"
             if slider_key in st.session_state:
                 coords.append(st.session_state[slider_key])
             else:
-                # Fallback to bayes_manager if slider not initialized
-                coords.append(self.bayes_manager.look_coords["value"][param])
+                # Fallback to bayes_manager default coordinates
+                default_coords = self.bayes_manager.get_best_coordinates()
+                if default_coords and param in default_coords:
+                    coords.append(default_coords[param])
+                else:
+                    # Ultimate fallback to bounds midpoint
+                    bounds = self.bounds[param]
+                    coords.append((bounds["lower_bound"] + bounds["upper_bound"]) / 2)
         return coords
 
     def plot_gaussian_process(self, gp_model=SingleTaskGP, coords=None):
@@ -267,7 +257,7 @@ class UiBayesPlotter:
                     title="Group Performance Distribution",
                 )
 
-                
+
                 fig.update_traces(boxmean="sd")
                 fig.update_layout(
                     xaxis_title="Group",
@@ -302,16 +292,15 @@ if __name__ == "__main__":
         return BayesClientManager.init_from_client(client)
 
     def load_manual():
-        """Load a manual test dataset using BayesClientManager"""
+        """Load a manual test dataset using BayesClientManager with group labels"""
         test_df = pd.DataFrame(
             {
-                "x1": [0.1, 0.1, 0.2],
-                "x2": [0.2, 0.3, 0.2],
-                "response": [1.0, 1.5, 2.0],
+                "x1": [0.1, 0.1, 0.2, 0.3, 0.4, 0.5],
+                "x2": [0.2, 0.3, 0.2, 0.1, 0.5, 0.6],
+                "response": [1.0, 1.5, 2.0, 2.5, 1.8, 3.0],
+                'group': [1, 1, 2, 2, 3, 3],
             }
         )
-        test_df = pd.DataFrame(columns=["x1", "x2", "response"])
-    
 
         bounds = {
             "x1": {"lower_bound": 0.0, "upper_bound": 1.0, "log_scale": False},
