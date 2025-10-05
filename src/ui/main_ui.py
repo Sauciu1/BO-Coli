@@ -57,14 +57,7 @@ class ExperimentInitialiser:
         
 
 
-    def _init_experiment(self):
-        if st.session_state.get("experiment_created", False):
-            st.title("🎉 EXPERIMENT CREATED SUCCESSFULLY!")
-            if st.button("SUCCESS", type="primary", use_container_width=True):
-                st.balloons()
-                st.rerun()
-            return
-        
+    def _init_experiment(self):        
         if "new_exp" not in st.session_state:
             st.session_state.new_exp = InitExperiment()
         
@@ -75,6 +68,7 @@ class ExperimentInitialiser:
             if st.button("Finish Setup and Start Experiment", type="primary", use_container_width=True):
                 st.session_state.experiment_created = True
                 st.session_state.initializing_experiment = False
+                st.balloons()  # Show celebration immediately
                 st.rerun()
 
 
@@ -103,19 +97,27 @@ class main_manager:
         if not bayes_manager:
             st.error("No experiment data loaded.")
             return
-            
+        
+        self.group_manager.render_all()
+       # self.group_manager.show_data_stats()
+
+        st.divider()
+        st.subheader("Visualization & Analysis")
+        UiBayesPlotter(bayes_manager, self.group_manager).main_loop()
+
+        st.divider()
 
         try:
-            # Sync all groups to manager first
-            self.group_manager.sync_all_groups_to_manager()
+            # Function to prepare download data with sync
+            def prepare_download_data():
+                # Sync all groups to manager when download is requested
+                self.group_manager.sync_all_groups_to_manager()
+                return pickle.dumps(self.group_manager.bayes_manager)
             
-            # Create pickle data
-            pickle_data = pickle.dumps(bayes_manager)
-            
-            # Direct download button
+            # Direct download button with on-demand data preparation
             st.download_button(
                 label="💾 Download Experiment Data",
-                data=pickle_data,
+                data=prepare_download_data(),
                 file_name="experiment_data.pkl",
                 mime="application/octet-stream",
                 help="Download the complete experiment as a pickle file"
@@ -123,12 +125,8 @@ class main_manager:
         except Exception as e:
             st.error(f"❌ Error preparing download: {e}")
         
-        self.group_manager.render_all()
-       # self.group_manager.show_data_stats()
+        
 
-        st.divider()
-        st.subheader("Visualization & Analysis")
-        UiBayesPlotter(bayes_manager).main_loop()
     
        
 

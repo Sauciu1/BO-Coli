@@ -222,6 +222,7 @@ class InitExperiment:
 
                 
                 st.success("Experiment configured!")
+                st.rerun()
 
                # st.rerun()
 

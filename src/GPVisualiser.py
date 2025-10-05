@@ -384,7 +384,8 @@ class GPVisualiserPlotly(GPVisualiser):
                     x=[float(xi), float(xi)],
                     y=[float(mi - 2 * si), float(mi + 2 * si)],
                     mode='lines',
-                    line=dict(color='red', width=float(sz * 1 + 0.1)),
+                    line=dict(color='#D45AFF', 
+                              width=float(sz * 10 + 5)),
                     opacity=0.3,
                     showlegend=False,
                     name='Predicted (selected point)'
@@ -392,19 +393,7 @@ class GPVisualiserPlotly(GPVisualiser):
                 row=ax.row, col=ax.col
             )
             
-            # Center point
-            ax.fig.add_trace(
-                go.Scatter(
-                    x=[float(xi)],
-                    y=[float(mi)],
-                    mode='markers',
-                    marker=dict(color='red', size=float(sz * 8 + 3)),
-                    opacity=0.3,
-                    showlegend=False,
-                    name='Predicted (selected point)'
-                ),
-                row=ax.row, col=ax.col
-            )
+
 
     @staticmethod
     def _plot_gp(grid: Tensor, mean: Tensor, std: Tensor, ax, coordinates):
@@ -468,7 +457,7 @@ class GPVisualiserPlotly(GPVisualiser):
             cols=cols,
             subplot_titles=subplot_titles,
             vertical_spacing=0.1,
-            horizontal_spacing=0.1
+            horizontal_spacing=0.05
         )
         
         # Create wrapper objects for each subplot
@@ -589,7 +578,8 @@ class GPVisualiserPlotly(GPVisualiser):
 
 if __name__ == "__main__":
 
-    manager = BayesClientManager.init_self_from_pickle("data/example_manager.pkl")
+    with open("data/example_manager.pkl", "rb") as f:
+        manager = BayesClientManager.init_self_from_pickle(f)
 
     visualiser = GPVisualiserPlotly(
         bayes_manager=manager,

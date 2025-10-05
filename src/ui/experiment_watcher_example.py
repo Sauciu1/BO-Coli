@@ -4,7 +4,7 @@ This demonstrates how other components can watch for and react to experiment cre
 """
 
 import streamlit as st
-from src.ui.UI_main import ExperimentInitialiser
+from ui.main_ui import ExperimentInitialiser
 
 def on_experiment_created(bayes_manager):
     """
