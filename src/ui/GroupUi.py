@@ -29,10 +29,9 @@ class GroupUi:
                 st.session_state.groups[group_label] = SingleGroup(
                     group_df, group_label, self.bayes_manager
                 )
-           # else:
-                # Update existing group with fresh data from manager
-            #    existing_group = st.session_state.groups[group_label]
-            #    existing_group.group_df = group_df.copy()
+            else:
+                # Update existing group with fresh data from manager to prevent stale data
+                st.session_state.groups[group_label].sync_from_manager(group_df)
             
             current_groups[group_label] = st.session_state.groups[group_label]
         
@@ -99,9 +98,9 @@ class GroupUi:
                 cols = st.columns([0.05, 1])
                 
                 with cols[1]:
-                    group.render()
-                    # Ensure data is synced back to manager after rendering
-                    group.write_data_to_manager()
+                    # Render group and handle data changes directly
+                    if group.render():  # Returns True if data was modified
+                        group.write_data_to_manager()
                 
                 with cols[0]:
                     st.write("")
@@ -190,9 +189,9 @@ class GroupUi:
                 st.dataframe(df, width="stretch")
         
         with cols[1]:
-            if st.button("Sync All Groups"):
+            if st.button("Force Sync All"):
                 self.sync_all_groups_to_manager()
-                st.success("All groups synchronized to manager")
+                st.success("All groups force synchronized")
         
         with cols[2]:
             if self.bayes_manager.has_response:

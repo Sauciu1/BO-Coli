@@ -19,14 +19,29 @@ class UiBayesPlotter:
             columns = st.columns([0.3, 0.3, 0.5])
 
             def set_look_coords():
-                defaults = self.bayes_manager.get_best_coordinates()
-                best_group = self.bayes_manager.get_best_group()
+                # Cache expensive computations
+                if 'best_coords_cache' not in st.session_state:
+                    st.session_state['best_coords_cache'] = {}
+                
+                cache_key = f"{len(self.bayes_manager.data)}_{hash(str(self.bayes_manager.data[self.bayes_manager.response_label].values.tobytes()))}"
+                
+                if cache_key not in st.session_state['best_coords_cache']:
+                    defaults = self.bayes_manager.get_best_coordinates()
+                    best_group = self.bayes_manager.get_best_group()
+                    st.session_state['best_coords_cache'][cache_key] = {
+                        'coords': defaults,
+                        'group': best_group
+                    }
+                else:
+                    cached = st.session_state['best_coords_cache'][cache_key]
+                    defaults = cached['coords']
+                    best_group = cached['group']
+                
                 # Store the coordinates to be used as slider defaults
                 st.session_state['reset_to_best'] = True
                 st.session_state['target_coords'] = defaults
-                # Update the group selector to the best performing group
-                if best_group is not None:
-                    st.session_state['group_selector'] = str(best_group)
+                # Store best group for indirect update (avoid direct widget manipulation)
+                st.session_state['target_best_group'] = str(best_group) if best_group is not None else None
 
             def set_group_coords(group_name):
                 """Set coordinates to a specific group's values"""
@@ -43,7 +58,8 @@ class UiBayesPlotter:
             with columns[0]:
                 if st.button("Set to Best Performer", key="set_best_performer"):
                     set_look_coords()
-                    st.rerun()
+                    # Use a flag to trigger rerun on next render cycle instead of immediate rerun
+                    st.session_state['pending_rerun'] = True
                 plot_button = st.button("Plot Gaussian Process", key="plot_the_coords", type="primary")
 
             with columns[1]:
@@ -51,9 +67,19 @@ class UiBayesPlotter:
                 if self.bayes_manager.has_response and self.bayes_manager.group_label:
                     available_groups = sorted(self.bayes_manager.data[self.bayes_manager.group_label].unique())
                     
+                    # Handle indirect group selector update
+                    default_group = ""
+                    if st.session_state.get('target_best_group') is not None:
+                        target_group = st.session_state['target_best_group']
+                        if target_group in [str(g) for g in available_groups]:
+                            default_group = target_group
+                        # Clear the target after using it
+                        st.session_state['target_best_group'] = None
+                    
                     selected_group = st.selectbox(
                         "Select Observation Group:",
                         options=[""] + list(available_groups),
+                        index=[""] + list(available_groups).index(default_group) if default_group in [str(g) for g in available_groups] else 0,
                         key="group_selector",
                         help="Choose a group to set coordinates to that group's values"
                     )
@@ -61,7 +87,7 @@ class UiBayesPlotter:
                     if selected_group and selected_group != "":
                         if st.button("Set to Group", key="set_to_group"):
                             set_group_coords(selected_group)
-                            st.rerun()
+                            st.session_state['pending_rerun'] = True
 
             with columns[2]:
                 self.look_coords_slider()
@@ -83,6 +109,11 @@ class UiBayesPlotter:
             st.error("Bayesian manager or feature labels not provided.")
             return
 
+        # Handle pending rerun
+        if st.session_state.get('pending_rerun', False):
+            st.session_state['pending_rerun'] = False
+            st.rerun()
+
         # Check if we need to reset coordinates
         target_coords = None
         if st.session_state.get('reset_to_best', False) or st.session_state.get('reset_to_group', False):
@@ -91,8 +122,11 @@ class UiBayesPlotter:
             st.session_state['reset_to_best'] = False
             st.session_state['reset_to_group'] = False
 
-        # Get default values
-        defaults = self.bayes_manager.get_best_coordinates()
+        # Cache default values to avoid expensive recomputation
+        if 'default_coords_cache' not in st.session_state:
+            st.session_state['default_coords_cache'] = self.bayes_manager.get_best_coordinates()
+        
+        defaults = st.session_state['default_coords_cache']
         current_coords = {}
         
         for param in self.bayes_manager.feature_labels:
