@@ -31,9 +31,11 @@ class BayesClientManager:
 
         self._objective_direction = "maximise"  # or "minimise"
 
+        self.resync_self:callable = None
+
     acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement}
 
-    gp_options = {"SingleTaskGP": SingleTaskGP, "HeteroWhiteSGP": HeteroWhiteSGP, "GammaNoiseSGP": GammaNoiseSGP}
+    gp_options = {"HeteroWhiteSGP": HeteroWhiteSGP, "SingleTaskGP": SingleTaskGP, "GammaNoiseSGP": GammaNoiseSGP}
 
     @property
     def objective_direction(self):
@@ -155,6 +157,8 @@ class BayesClientManager:
 
     @property
     def has_response(self):
+        if self.resync_self is not None:
+            self.resync_self()
         if self.data is None or self.data.empty:
             return False
         return not self.data[self.response_label].isna().all()
@@ -163,7 +167,7 @@ class BayesClientManager:
     def gp(self):
         """Initialize and return the Gaussian Process model"""
         if not hasattr(self, "_gp"):
-            self._gp = SingleTaskGP
+            self._gp = list(self.gp_options.values())[0]
         return self._gp
 
     @gp.setter
@@ -307,6 +311,7 @@ class BayesClientManager:
         )
 
         return manager
+
 
     def get_batch_targets(self, n_targets: int):
         """Get next batch of target points from the client"""

@@ -6,13 +6,25 @@ from src.BayesClientManager import BayesClientManager
 import pandas as pd
 import streamlit as st
 from botorch.models import SingleTaskGP
+import plotly.express as px
 
-
-class UiBayesPlotter:
-    def __init__(self, bayes_manager: BayesClientManager, group_manager=None):
+class BayesPlotter:
+    def __init__(self, bayes_manager: BayesClientManager):
         self.bayes_manager = bayes_manager
-        self.group_manager = group_manager
+   
 
+    def check_plot_ready(passed_function):
+        """Decorator to ensure the bayes_manager is synced and has response data before plotting"""
+        def _inner_function(self, *args, **kwargs):
+            self.bayes_manager.sync_self()
+            if self.bayes_manager.has_response:
+                return passed_function(self, *args, **kwargs)
+            else:
+                st.warning("No data available for plotting.")
+                return None
+        return _inner_function
+
+    @check_plot_ready
     def _set_to_best_performer(self):
         if st.button("Set to Best Performer", key="set_best_performer"):
             # Use BayesClientManager to get best coordinates and group
@@ -23,19 +35,20 @@ class UiBayesPlotter:
                 # Cache the results for performance
                 if "best_coords_cache" not in st.session_state:
                     st.session_state["best_coords_cache"] = {}
-                
+
                 cache_key = f"{len(self.bayes_manager.data)}_{hash(str(self.bayes_manager.data[self.bayes_manager.response_label].values.tobytes()))}"
                 st.session_state["best_coords_cache"][cache_key] = {
                     "coords": best_coords,
                     "group": best_group,
                 }
 
-                # Set UI state
-                st.session_state["group_selector"] = str(best_group)
+                if "group_selector" not in st.session_state:
+                    st.session_state["group_selector"] = str(best_group)
                 self._set_group_coords(best_group)
                 st.session_state["pending_rerun"] = True
                 st.rerun(scope="fragment")
 
+    @check_plot_ready
     def _set_group_coords(self, group_name):
         """Set coordinates to a specific group's values using BayesClientManager."""
         groups_dict = self.bayes_manager.get_groups()
@@ -43,7 +56,9 @@ class UiBayesPlotter:
             group_data = groups_dict[group_name]
             if not group_data.empty:
                 # Get the first row of the group for coordinates
-                group_coords = group_data[self.bayes_manager.feature_labels].iloc[0].to_dict()
+                group_coords = (
+                    group_data[self.bayes_manager.feature_labels].iloc[0].to_dict()
+                )
                 # Store the coordinates to be used as slider defaults
                 st.session_state["reset_to_group"] = True
                 st.session_state["target_coords"] = group_coords
@@ -51,41 +66,29 @@ class UiBayesPlotter:
     @st.fragment
     def choose_plot_coordinates(self):
         """Allows user to manually set coordinates for plotting the GP"""
-        with st.expander("📊 Plot GP at Specific Coordinates", expanded=False):
-            columns = st.columns([0.3, 0.3, 0.5])
 
-            with columns[0]:
-                self._set_to_best_performer()
-                plot_button = st.button(
-                    "Plot Gaussian Process", key="plot_the_coords", type="primary"
+        columns = st.columns([0.3, 0.3, 0.5])
+
+        with columns[1]:
+
+            self._choose_group_for_coords()
+
+        with columns[2]:
+            self.look_coords_slider()
+
+        with columns[0]:
+            self._set_to_best_performer()
+            if st.button(
+                "Plot Gaussian Process", key="plot_the_coords", type="primary"
+            ):
+                self.plot_gaussian_process(
+                    gp_model=SingleTaskGP, coords=self.plot_coords
                 )
 
-            with columns[1]:
 
-                self._choose_group_for_coords()
 
-            with columns[2]:
-                self.look_coords_slider()
 
-            # Execute plotting inside the expander
-            if plot_button and self.bayes_manager.has_response:
-                # Sync all groups to manager before plotting to ensure latest data
-                if self.group_manager:
-                    self.group_manager.sync_all_groups_to_manager()
-
-                if self.plot_coords is None or len(self.plot_coords) != len(
-                    self.bayes_manager.feature_labels
-                ):
-                    st.error(
-                        f"Please provide exactly {len(self.bayes_manager.feature_labels)} coordinates."
-                    )
-                else:
-                    self.plot_gaussian_process(
-                        gp_model=SingleTaskGP, coords=self.plot_coords
-                    )
-            elif plot_button:
-                st.warning("No data available to plot the GP.")
-
+    @check_plot_ready
     def _choose_group_for_coords(self):
         if self.bayes_manager.has_response and self.bayes_manager.group_label:
             # Use BayesClientManager to get available groups
@@ -116,12 +119,18 @@ class UiBayesPlotter:
                 if group_id in groups_dict:
                     group_data = groups_dict[group_id]
                     if not group_data.empty:
-                        mean_response = group_data[self.bayes_manager.response_label].mean()
+                        mean_response = group_data[
+                            self.bayes_manager.response_label
+                        ].mean()
                         if pd.notna(mean_response):
-                            st.caption(f"Group {selected_group} mean response: **{mean_response:.4f}**")
+                            st.caption(
+                                f"Group {selected_group} mean response: **{mean_response:.4f}**"
+                            )
                         else:
-                            st.caption(f"Group {selected_group}: No response data available")
-
+                            st.caption(
+                                f"Group {selected_group}: No response data available"
+                            )
+    @check_plot_ready
     def look_coords_slider(self):
         """Create sliders for each parameter to set look coordinates"""
         if self.bayes_manager is None or not self.bayes_manager.feature_labels:
@@ -146,7 +155,9 @@ class UiBayesPlotter:
         # Cache default values to avoid expensive recomputation
         if "default_coords_cache" not in st.session_state:
             best_coords = self.bayes_manager.get_best_coordinates()
-            st.session_state["default_coords_cache"] = best_coords if best_coords is not None else {}
+            st.session_state["default_coords_cache"] = (
+                best_coords if best_coords is not None else {}
+            )
 
         defaults = st.session_state["default_coords_cache"]
         current_coords = {}
@@ -205,6 +216,7 @@ class UiBayesPlotter:
                     coords.append((bounds["lower_bound"] + bounds["upper_bound"]) / 2)
         return coords
 
+    @check_plot_ready
     def plot_gaussian_process(self, gp_model=SingleTaskGP, coords=None):
         """Plot the Gaussian Process using GPVisualiserPlotly"""
         if not self.bayes_manager.has_response:
@@ -231,55 +243,51 @@ class UiBayesPlotter:
         )
 
     @st.fragment
+    @check_plot_ready
     def plot_group_performance(self):
         """Performance of each observation group as box plot"""
-        import plotly.express as px
+        
 
         if not self.bayes_manager.has_response:
             st.warning("No data available to plot.")
             return None
-        with st.expander("📈 Plot Observation Performance", expanded=False):
-            if st.button("Generate Performance Plot", key="plot_obs_performance"):
-                # Sync all groups to manager before plotting to ensure latest data
-                if self.group_manager:
-                    self.group_manager.sync_all_groups_to_manager()
 
-                if not self.bayes_manager.has_response:
-                    st.warning("No data available to plot.")
-                    return None
+        # Render plot inside the expander
+        fig = px.box(
+            data_frame=self.bayes_manager.data,
+            x=self.bayes_manager.group_label,
+            y=self.bayes_manager.response_label,
+            points="all",
+            title="Group Performance Distribution",
+        )
 
-                # Render plot inside the expander
-                fig = px.box(
-                    data_frame=self.bayes_manager.data,
-                    x=self.bayes_manager.group_label,
-                    y=self.bayes_manager.response_label,
-                    points="all",
-                    title="Group Performance Distribution",
-                )
+        fig.update_traces(boxmean="sd")
+        fig.update_layout(
+            xaxis_title="Group",
+            yaxis_title="Response",
+            legend_title="Group",
+            margin=dict(l=10, r=10, t=60, b=40),
+        )
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={
+                "displayModeBar": True,
+                "displaylogo": False,
+                "modeBarButtonsToRemove": ["pan2d", "lasso2d"],
+            },
+        )
+        return fig
 
-
-                fig.update_traces(boxmean="sd")
-                fig.update_layout(
-                    xaxis_title="Group",
-                    yaxis_title="Response",
-                    legend_title="Group",
-                    margin=dict(l=10, r=10, t=60, b=40),
-                )
-                st.plotly_chart(
-                    fig,
-                    use_container_width=True,
-                    config={
-                        "displayModeBar": True,
-                        "displaylogo": False,
-                        "modeBarButtonsToRemove": ["pan2d", "lasso2d"],
-                    },
-                )
-                return fig
-        return None
-
+    @st.fragment
     def main_loop(self):
-        self.plot_group_performance()
-        self.choose_plot_coordinates()
+        if st.button("Reload Data for Plotting", key="reload_data_plot"):
+            self.bayes_manager.sync_self()
+            st.rerun(scope="fragment")
+        with st.expander("📈 Plot Group Performance", expanded=True):
+            self.plot_group_performance()
+        with st.expander("📊 Plot GP at Specific Coordinates", expanded=True):
+            self.choose_plot_coordinates()
 
 
 if __name__ == "__main__":
@@ -298,7 +306,7 @@ if __name__ == "__main__":
                 "x1": [0.1, 0.1, 0.2, 0.3, 0.4, 0.5],
                 "x2": [0.2, 0.3, 0.2, 0.1, 0.5, 0.6],
                 "response": [1.0, 1.5, 2.0, 2.5, 1.8, 3.0],
-                'group': [1, 1, 2, 2, 3, 3],
+                "group": [1, 1, 2, 2, 3, 3],
             }
         )
 
@@ -316,5 +324,5 @@ if __name__ == "__main__":
 
     st.set_page_config(layout="wide")
     bayes_manager = load_manual()
-    plotter = UiBayesPlotter(bayes_manager)
+    plotter = BayesPlotter(bayes_manager)
     plotter.main_loop()

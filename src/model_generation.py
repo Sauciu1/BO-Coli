@@ -44,10 +44,8 @@ class HeteroNoiseSGP(SingleTaskGP):
         std_unique, std_all, n_counts, inverse = self._calc_std(train_X, train_Y)
 
         if all(n_counts == 1):
-            print("Warning: All points have only one repeat. Consider using WhiteNoiseSGP instead.")
-            SingleTaskGP.__init__(self, train_X, train_Y, **kwargs)
-        
-
+            print("Warning: All points have only one repeat. defaulting to a Gamma Noise Kernel.")
+            GammaNoiseSGP.__init__(self, train_X, train_Y, **kwargs)
         likelihood = FixedNoiseGaussianLikelihood(noise=std_all)
 
 

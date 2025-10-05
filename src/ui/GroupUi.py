@@ -52,6 +52,14 @@ class GroupUi:
     def has_data(self):
         """Check if there's any data available"""
         return not self.bayes_manager.data.empty
+    
+
+    def decorator_reload_data(passed_function):
+        """Decorator to ensure the bayes_manager is synced and has response data before plotting"""
+        def _inner_function(self, *args, **kwargs):
+            self.bayes_manager.sync_self()
+            return passed_function(self, *args, **kwargs)
+        return _inner_function
         
 
     def add_manual_group(self):
@@ -81,7 +89,7 @@ class GroupUi:
 
     @st.fragment
     def render_all(self):
-        # Control buttons
+
         self._render_controls()
 
         st.divider()
@@ -144,26 +152,23 @@ class GroupUi:
         with cols[0]:
             batch_size = st.number_input("Batch Size", min_value=1, value=1, step=1)
         with cols[1]:
-            if target_button := st.button("Get New Targets", disabled=False):
-                def sync_command():
-                        self.sync_all_groups_to_manager()
-                        
-                        self.bayes_manager.get_batch_targets(batch_size)
-                        
-                        # Clear cached groups to force refresh with new data
-                        st.session_state.groups = {}
-                        st.rerun(scope='fragment')
+            if st.button("Get New Targets", disabled=False):
+                self._get_new_batch(batch_size)
 
+    @decorator_reload_data
+    def _get_new_batch(self, batch_size: int):
+        try:
+            self.sync_all_groups_to_manager()
+            
+            self.bayes_manager.get_batch_targets(batch_size)
+            
+            st.session_state.groups = {}
+            st.rerun(scope='fragment')
+        except Exception as e:
 
- 
-                try:
-                    sync_command()
-                    st.success("New targets generated!")
-                except Exception as e:
-
-                    st.error(f"Error generating targets: {str(e)}")
-                    st.error("The model needs more data or has fully explored the space. Please add more data or generate smaller batches.")
-
+            st.error(f"Error generating targets: {str(e)}")
+            st.error("The model needs more data or has fully explored the space."+
+                     " Please add more data or generate smaller batches.")
 
     @st.fragment
     def show_data_stats(self):
@@ -210,9 +215,11 @@ class GroupUi:
     
     def sync_all_groups_to_manager(self):
         """Synchronize all group changes back to the BayesClientManager"""
+   
         for group in self.groups.values():
             group.write_data_to_manager()
-        return group
+            self.get_current_data()
+        return len(self.groups.values())
 
 
 if __name__ == "__main__":

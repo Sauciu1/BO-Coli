@@ -21,3 +21,18 @@ streamlit run src/UI_main.py
 
 
 You bo-coli venv should now appear, run everything from it.
+
+
+##
+To deploy BOcoli with docker:
+```powershell
+docker build -t bo_coli:v6 .
+docker run -p 8989:8989 bo_coli:v6
+
+```
+
+You can now connect to the app via your browser window at:
+
+```
+http://localhost:8989/
+```
