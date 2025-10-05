@@ -16,45 +16,55 @@ class UiBayesPlotter:
     def choose_plot_coordinates(self):
         """Allows user to manually set coordinates for plotting the GP"""
         with st.expander("📊 Plot GP at Specific Coordinates", expanded=False):
-            columns = st.columns([0.6, 0.4])
+            columns = st.columns([0.3, 0.3, 0.5])
 
             def set_look_coords():
                 defaults = self.bayes_manager.get_best_coordinates()
-                self.bayes_manager.look_coords = pd.DataFrame([defaults]).T.rename(columns={0: "value"})
+                best_group = self.bayes_manager.get_best_group()
+                # Store the coordinates to be used as slider defaults
+                st.session_state['reset_to_best'] = True
+                st.session_state['target_coords'] = defaults
+                # Update the group selector to the best performing group
+                if best_group is not None:
+                    st.session_state['group_selector'] = str(best_group)
 
-            if "manual_coords_df" not in st.session_state:
-                set_look_coords()
+            def set_group_coords(group_name):
+                """Set coordinates to a specific group's values"""
+                group_data = self.bayes_manager.data[
+                    self.bayes_manager.data[self.bayes_manager.group_label] == group_name
+                ]
+                if not group_data.empty:
+                    # Get the first row of the group (or you could use mean/median)
+                    group_coords = group_data[self.bayes_manager.feature_labels].iloc[0].to_dict()
+                    # Store the coordinates to be used as slider defaults
+                    st.session_state['reset_to_group'] = True
+                    st.session_state['target_coords'] = group_coords
 
             with columns[0]:
                 if st.button("Set to Best Performer", key="set_best_performer"):
                     set_look_coords()
-                plot_button = st.button("Plot Gaussian Process", key="plot_the_coords")
+                    st.rerun()
+                plot_button = st.button("Plot Gaussian Process", key="plot_the_coords", type="primary")
 
             with columns[1]:
-                bounds_values = [self.bounds[c] for c in self.bayes_manager.feature_labels]
-                self.bayes_manager.look_coords = st.data_editor(
-                    self.bayes_manager.look_coords,
-                    num_rows="fixed",
-                    width="stretch",
-                    column_config={
-                        "value": st.column_config.NumberColumn(
-                            format="%.3e",
-                            min_value=min(b["lower_bound"] for b in bounds_values),
-                            max_value=max(b["upper_bound"] for b in bounds_values),
-                            help="Parameter value (will be clamped to valid range)",
-                        )
-                    },
-                    key="manual_coords_editor",
-                )
 
-            # Clamp values to parameter ranges
-            for param in self.bayes_manager.feature_labels:
-                if param in self.bayes_manager.look_coords.index:
-                    bounds = self.bounds[param]
-                    current_val = self.bayes_manager.look_coords.loc[param, "value"]
-                    self.bayes_manager.look_coords.loc[param, "value"] = max(
-                        bounds["lower_bound"], min(bounds["upper_bound"], current_val)
+                if self.bayes_manager.has_response and self.bayes_manager.group_label:
+                    available_groups = sorted(self.bayes_manager.data[self.bayes_manager.group_label].unique())
+                    
+                    selected_group = st.selectbox(
+                        "Select Observation Group:",
+                        options=[""] + list(available_groups),
+                        key="group_selector",
+                        help="Choose a group to set coordinates to that group's values"
                     )
+                    
+                    if selected_group and selected_group != "":
+                        if st.button("Set to Group", key="set_to_group"):
+                            set_group_coords(selected_group)
+                            st.rerun()
+
+            with columns[2]:
+                self.look_coords_slider()
 
             # Execute plotting inside the expander
             if plot_button and self.bayes_manager.has_response:
@@ -67,6 +77,50 @@ class UiBayesPlotter:
             elif plot_button:
                 st.warning("No data available to plot the GP.")
 
+    def look_coords_slider(self):
+        """Create sliders for each parameter to set look coordinates"""
+        if self.bayes_manager is None or not self.bayes_manager.feature_labels:
+            st.error("Bayesian manager or feature labels not provided.")
+            return
+
+        # Check if we need to reset coordinates
+        target_coords = None
+        if st.session_state.get('reset_to_best', False) or st.session_state.get('reset_to_group', False):
+            target_coords = st.session_state.get('target_coords', {})
+            # Clear the reset flags
+            st.session_state['reset_to_best'] = False
+            st.session_state['reset_to_group'] = False
+
+        # Get default values
+        defaults = self.bayes_manager.get_best_coordinates()
+        current_coords = {}
+        
+        for param in self.bayes_manager.feature_labels:
+            bounds = self.bounds[param]
+            
+            # Use target coordinates if resetting, otherwise use defaults
+            if target_coords and param in target_coords:
+                default_value = target_coords[param]
+            else:
+                default_value = defaults.get(param, bounds["lower_bound"])
+            
+            slider_value = st.slider(
+                label=f"Set {param}",
+                min_value=bounds["lower_bound"],
+                max_value=bounds["upper_bound"],
+                value=default_value,
+                step=(bounds["upper_bound"] - bounds["lower_bound"]) / 100.0,
+                format="%.3e",
+                key=f"slider_{param}"
+            )
+            
+            current_coords[param] = slider_value
+
+        # Update bayes_manager with current slider values
+        self.bayes_manager.look_coords = pd.DataFrame.from_dict(
+            {k: [v] for k, v in current_coords.items()}
+        ).T.rename(columns={0: "value"})
+
     @property
     def bounds(self) -> dict:
         if self.bayes_manager.bounds:
@@ -76,8 +130,16 @@ class UiBayesPlotter:
 
     @property
     def plot_coords(self):
- 
-        return list(self.bayes_manager.look_coords["value"].values)
+        # Get current slider values directly from session state
+        coords = []
+        for param in self.bayes_manager.feature_labels:
+            slider_key = f"slider_{param}"
+            if slider_key in st.session_state:
+                coords.append(st.session_state[slider_key])
+            else:
+                # Fallback to bayes_manager if slider not initialized
+                coords.append(self.bayes_manager.look_coords["value"][param])
+        return coords
 
 
     def plot_gaussian_process(self, gp_model=SingleTaskGP, coords=None):
@@ -90,10 +152,7 @@ class UiBayesPlotter:
             return
 
         plotter = GPVisualiserPlotly(
-            gp=gp_model,
-            obs=self.bayes_manager.data,
-            dim_cols=self.bayes_manager.feature_labels,
-            response_col=self.bayes_manager.response_label,
+            self.bayes_manager
         )
 
         fig, ax = plotter.plot_all(coordinates=coords)

@@ -1,3 +1,4 @@
+import sys
 import pandas as pd
 import uuid
 from botorch.models import SingleTaskGP
@@ -233,6 +234,13 @@ class BayesClientManager:
         best_idx = self.agg_stats["mean"].idxmax()
         return self.agg_stats.loc[best_idx, self.feature_labels].to_dict()
 
+    def get_best_group(self):
+        """Get the group label of the best-performing observation"""
+        if self.agg_stats.empty:
+            return None
+        best_idx = self.agg_stats["mean"].idxmax()
+        return self.agg_stats.loc[best_idx, self.group_label]
+
     def _create_ax_client(self):
         client = Client()
 
@@ -384,6 +392,44 @@ class BayesClientManager:
     def get_groups(self) -> dict[int, pd.DataFrame]:
         """Get a dictionary of unique group labels and their corresponding data."""
         return {label: self.data[self.data[self.group_label] == label] for label in self.current_group_labels}
+    
+    @staticmethod
+    def init_self_from_pickle(file_path: str):
+        """Initialize BayesClientManager from a pickle file, handling module path changes."""
+        with open(file_path, "rb") as f:
+            unpickler = CompatibleUnpickler(f)
+            manager = unpickler.load()
+        
+        if not isinstance(manager, BayesClientManager):
+            raise ValueError("The loaded object is not a BayesClientManager instance.")
+        return manager
+    
+
+import pickle
+
+
+class CompatibleUnpickler(pickle.Unpickler):
+    """Custom unpickler to handle module path changes"""
+    def find_class(self, module, name):
+        # Handle BayesClientManager from different module paths
+        if name == 'BayesClientManager':
+            return BayesClientManager
+        
+        # Handle module path remapping
+        module_remapping = {
+            '__main__': 'src.BayesClientManager',
+            'BayesClientManager': 'src.BayesClientManager',
+            'src.ui.UI_main': 'src.BayesClientManager'
+        }
+        
+        if module in module_remapping and name == 'BayesClientManager':
+            try:
+                target_module = sys.modules[module_remapping[module]]
+                return getattr(target_module, name)
+            except (KeyError, AttributeError):
+                pass
+        
+        return super().find_class(module, name)
 
         
 

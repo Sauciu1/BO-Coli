@@ -5,7 +5,7 @@
 from ax import Client
 
 from ax.plot import render
-from ipykernel.pickleutil import istype
+
 import pandas as pd
 import torch
 from torch import Tensor
@@ -13,12 +13,12 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from ax import RangeParameterConfig
 from sklearn.preprocessing import FunctionTransformer
-import src.ax_helper as ax_helper
-from src.ax_helper import get_train_Xy, get_obs_from_client, UnitCubeScaler
+import tempfile, webbrowser, plotly.io as pio
+from src.ax_helper import  UnitCubeScaler
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from src.BayesClientManager import BayesClientManager
 
 
 
@@ -39,32 +39,18 @@ def subplot_dims(n) -> tuple[int, int]:
 class GPVisualiser:
     def __init__(
         self,
-        gp: callable,
-        obs: pd.DataFrame,
-        dim_cols: list[str],
-        response_col="response",
-        feature_range_params: RangeParameterConfig = None,
+        bayes_manager: BayesClientManager,
     ) -> None:
 
-        if not callable(gp):
-            raise TypeError(
-                "gp must be a callable that returns a trained GP model when given training data"
-            )
-        if not isinstance(obs, pd.DataFrame):
-            raise TypeError("obs must be a pandas DataFrame")
-        if not isinstance(dim_cols, list) or not all(
-            isinstance(col, str) for col in dim_cols
-        ):
-            raise TypeError("dim_cols must be a list of strings")
-        if not isinstance(response_col, str):
-            raise TypeError("response_col must be a string")
 
-        self.response_col = response_col
-        self.dim_cols = dim_cols
 
-        # Create mask that is True if there's NA in any of the specified columns for each row
+        self.bayes_manager = bayes_manager
+        self.response_label = bayes_manager.response_label
+        self.feature_labels = bayes_manager.feature_labels
+        feature_range_params= bayes_manager._ax_parameters
 
-        obs_X, obs_y = self.get_obs_X_y(obs)
+        gp = self.bayes_manager.gp
+
 
         
         if feature_range_params is not None:
@@ -79,35 +65,41 @@ class GPVisualiser:
 
         self.fig = None
 
+    @property
+    def get_obs_X_y(self):
+        obs = self.bayes_manager.data
+        mask_na = obs[[self.response_label] + self.feature_labels].isna().any(axis=1)
 
-    def get_obs_X_y(self, obs:pd.DataFrame):
-        mask_na = obs[[self.response_col] + self.dim_cols].isna().any(axis=1)
-
-        self.predict_X = obs.loc[mask_na, self.dim_cols]
-        self.predict_y = obs.loc[mask_na, self.response_col]
+        self.predict_X = obs.loc[mask_na, self.feature_labels]
+        self.predict_y = obs.loc[mask_na, self.response_label]
         
-        self.obs_X = obs.loc[~mask_na, self.dim_cols]
-        self.obs_y = obs.loc[~mask_na, self.response_col]
+        self.obs_X = obs.loc[~mask_na, self.feature_labels]
+        self.obs_y = obs.loc[~mask_na, self.response_label]
         return self.obs_X, self.obs_y
+    
+    @property
+    def obs_X_vals(self):
+        return self.get_obs_X_y[0].values
+    @property
+    def obs_y_vals(self):
+        return self.get_obs_X_y[1].values
 
 
     def _train_gp(self, gp: callable):
-        """Train the GP model using the observed data."""
 
-        train_X = self.scaler.fit_transform(self.obs_X.values)
 
-        if istype(train_X, pd.DataFrame):
+        train_X = self.scaler.fit_transform(self.obs_X_vals)
+
+        if isinstance(train_X, pd.DataFrame):
             train_X = train_X.values
 
         train_X = torch.tensor(train_X, dtype=dtype, device=device)
-        train_Y = torch.tensor(self.obs_y.values, dtype=dtype, device=device).unsqueeze(
+        train_Y = torch.tensor(self.obs_y_vals, dtype=dtype, device=device).unsqueeze(
             -1
         )
 
         return gp(train_X, train_Y)
         
-
-    
 
     def _create_linspace(self, num_points: int = 100) -> list[Tensor]:
         linspaces = []
@@ -596,67 +588,19 @@ class GPVisualiserPlotly(GPVisualiser):
         self.fig.show()
 
 if __name__ == "__main__":
-    from src.toy_functions import ResponseFunction
-    from botorch.models import SingleTaskGP
 
+    manager = BayesClientManager.init_self_from_pickle("data/example_manager.pkl")
 
-    dim_names = ["x0","x1"]
-    dim_names = [f"x{i}" for i in range(len(dim_names))]
-    simple_func = lambda x: sum(torch.sqrt(x))
-
-    resp = ResponseFunction(simple_func, len(dim_names))
-    resp.evaluate(torch.tensor([1., 4]))
-
-    client = Client()
-
-    parameters=[
-        RangeParameterConfig(
-            name=dim,
-            bounds=(1, 100),
-            parameter_type="float",
-            # scaling = 'log',
-        ) for dim in dim_names
-    ]
-
-
-    client.configure_experiment(
-        name="batch_bo_test",
-        parameters=parameters
+    visualiser = GPVisualiserPlotly(
+        bayes_manager=manager,
     )
+    fig, axs = visualiser.plot_all(coordinates=None)
 
-
-    client.configure_optimization(objective="response")
-
-    client.get_next_trials(max_trials=10)
-
-
-
-
-    for i, trial in get_obs_from_client(client).iterrows():
-        if not pd.isna(trial['response']):
-            continue
-
-        response = resp.evaluate(trial[dim_names])
-        client.complete_trial(trial_index=i, raw_data={"response": float(response)})
-
-
-
-
-    client.get_next_trials(max_trials=6)
-
-    obs = get_obs_from_client(client)
-    
-    # Test Plotly version
-    plotter_plotly = GPVisualiserPlotly(SingleTaskGP, obs, dim_names, 'response', parameters)
-    fig, _ = plotter_plotly.plot_all(coordinates=torch.tensor([10.0, 10.0]))
     fig.show(render="browser")
-    import tempfile, webbrowser, plotly.io as pio
+
 
     # Explicitly write figure to an ephemeral HTML file and open in default browser
     _html = pio.to_html(fig, include_plotlyjs="cdn", full_html=True)
     with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False) as _f:
         _f.write(_html)
     webbrowser.open("file://" + _f.name)
-
-
-    None

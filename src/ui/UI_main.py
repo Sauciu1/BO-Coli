@@ -9,28 +9,7 @@ from src.ui.GroupUi import GroupUi
 from src.ui.BayesPlotter import UiBayesPlotter
 
 
-class CompatibleUnpickler(pickle.Unpickler):
-    """Custom unpickler to handle module path changes"""
-    def find_class(self, module, name):
-        # Handle BayesClientManager from different module paths
-        if name == 'BayesClientManager':
-            return BayesClientManager
-        
-        # Handle module path remapping
-        module_remapping = {
-            '__main__': 'src.BayesClientManager',
-            'BayesClientManager': 'src.BayesClientManager',
-            'src.ui.UI_main': 'src.BayesClientManager'
-        }
-        
-        if module in module_remapping and name == 'BayesClientManager':
-            try:
-                target_module = sys.modules[module_remapping[module]]
-                return getattr(target_module, name)
-            except (KeyError, AttributeError):
-                pass
-        
-        return super().find_class(module, name)
+
 
 
 class ExperimentInitialiser:
