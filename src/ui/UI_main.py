@@ -37,23 +37,23 @@ class ExperimentInitialiser:
     def _init_or_load_exp(self):
         if st.session_state.get("initializing_experiment", False):
             return self._init_experiment()
-        if st.session_state.get("loading_experiment", False):
-            return self._load_experiment()
             
         st.title("Bayesian Optimization Experiment Manager")
         st.write("Initialize a new experiment or load an existing one.")
 
-        if st.button("Initialize New Experiment"):
-            st.session_state.initializing_experiment = True
-            st.rerun()
-        if st.button("Load Existing Experiment"):
-            st.session_state.loading_experiment = True
-            st.rerun()
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Initialize New Experiment", use_container_width=True):
+                st.session_state.initializing_experiment = True
+                st.rerun()
+                
+        with col2:
+            self._load_exp_from_pickle_ui()
+            # File upload directly visible
+            
 
-
-    @st.fragment
-    def _load_experiment(self):
-        """Loads from pickle file containing BayesClientManager"""
+    def _load_exp_from_pickle_ui(self):
         uploaded_file = st.file_uploader("Upload saved experiment file", type=["pkl"])
         if uploaded_file is not None:
             try:
@@ -71,17 +71,16 @@ class ExperimentInitialiser:
                     
                     st.session_state.bayes_manager = loaded_obj
                     st.session_state.experiment_created = True
-                    st.session_state.loading_experiment = False
                     st.success("✅ Experiment file loaded successfully!")
                     st.rerun()
                 else:
-                    st.warning("⚠️ Invalid file: Expected BayesClientManager object. File not uploaded.")
+                    st.warning("⚠️ Invalid file: Expected BayesClientManager object.")
             except (pickle.UnpicklingError, AttributeError, ModuleNotFoundError) as e:
-                st.error(f"❌ Pickle file error: The file may have been created with a different version or module structure. {e}")
+                st.error(f"❌ Pickle file error: {e}")
             except Exception as e:
                 st.error(f"❌ Failed to load file: {e}")
-        else:
-            st.info("Please upload a pickle file containing a BayesClientManager object.")
+        
+
 
     def _init_experiment(self):
         if st.session_state.get("experiment_created", False):
@@ -123,21 +122,32 @@ class main_manager:
 
         
     def run_group_manager(self):
-        # Add save data button
-        if st.button("Save Data", help="Update and save data in Bayes manager"):
-            try:
-                self.group_manager.sync_all_groups_to_manager()
-                st.success("✅ Data updated in Bayes manager successfully!")
-            except Exception as e:
-                st.error(f"❌ Error updating data: {e}")
-        
         bayes_manager = st.session_state.get("bayes_manager")
         if not bayes_manager:
             st.error("No experiment data loaded.")
             return
+            
+
+        try:
+            # Sync all groups to manager first
+            self.group_manager.sync_all_groups_to_manager()
+            
+            # Create pickle data
+            pickle_data = pickle.dumps(bayes_manager)
+            
+            # Direct download button
+            st.download_button(
+                label="💾 Download Experiment Data",
+                data=pickle_data,
+                file_name="experiment_data.pkl",
+                mime="application/octet-stream",
+                help="Download the complete experiment as a pickle file"
+            )
+        except Exception as e:
+            st.error(f"❌ Error preparing download: {e}")
         
         self.group_manager.render_all()
-        self.group_manager.show_data_stats()
+       # self.group_manager.show_data_stats()
 
         st.divider()
         st.subheader("Visualization & Analysis")
@@ -146,8 +156,6 @@ class main_manager:
        
 
 if __name__ == "__main__":
-
-        
     if "manager" not in st.session_state:
         st.set_page_config(
             page_title="Bayesian Optimization for Biological Systems",

@@ -60,14 +60,11 @@ class GPVisualiser:
             raise TypeError("response_col must be a string")
 
         self.response_col = response_col
+        self.dim_cols = dim_cols
 
-        mask_na = obs[response_col].isna()
+        # Create mask that is True if there's NA in any of the specified columns for each row
 
-        self.predict_X = obs.loc[mask_na, dim_cols]
-        self.predict_y = obs.loc[mask_na, response_col]
-
-        self.obs_X = obs.loc[~mask_na, dim_cols]
-        self.obs_y = obs.loc[~mask_na, response_col]
+        obs_X, obs_y = self.get_obs_X_y(obs)
 
         
         if feature_range_params is not None:
@@ -77,15 +74,26 @@ class GPVisualiser:
             self.scaler = FunctionTransformer(lambda x: x, validate=False)
 
 
-        
-
         self.gp = self._train_gp(gp)
         self.subplot_dims = subplot_dims(self.obs_X.shape[1])
 
         self.fig = None
 
+
+    def get_obs_X_y(self, obs:pd.DataFrame):
+        mask_na = obs[[self.response_col] + self.dim_cols].isna().any(axis=1)
+
+        self.predict_X = obs.loc[mask_na, self.dim_cols]
+        self.predict_y = obs.loc[mask_na, self.response_col]
+        
+        self.obs_X = obs.loc[~mask_na, self.dim_cols]
+        self.obs_y = obs.loc[~mask_na, self.response_col]
+        return self.obs_X, self.obs_y
+
+
     def _train_gp(self, gp: callable):
         """Train the GP model using the observed data."""
+
         train_X = self.scaler.fit_transform(self.obs_X.values)
 
         if istype(train_X, pd.DataFrame):

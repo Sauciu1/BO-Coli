@@ -62,7 +62,7 @@ class SingleGroup:
 
         st.markdown(f"### Group {self.group_label}")
 
-        cols = st.columns([1.5, 2, 0.05])
+        cols = st.columns([1.5, 2, 0.15, 0.02])
 
         with cols[0]:
             st.write("**Parameters:**")
@@ -146,6 +146,7 @@ class SingleGroup:
                 "➕",
                 key=f"add_trial_group_{self.group_label}_{hash(str(self.group_df.index.tolist()))}",
                 help="Add trial",
+                width='content'
             ):
                 self.add_trial()
                 st.rerun(scope="fragment")
@@ -154,6 +155,7 @@ class SingleGroup:
                 "➖",
                 key=f"remove_trial_group_{self.group_label}_{hash(str(self.group_df.index.tolist()))}",
                 help="Remove last trial",
+                width='content'
             ):
                 self.remove_trial()
                 st.rerun(scope="fragment")

@@ -29,10 +29,10 @@ class GroupUi:
                 st.session_state.groups[group_label] = SingleGroup(
                     group_df, group_label, self.bayes_manager
                 )
-            else:
+           # else:
                 # Update existing group with fresh data from manager
-                existing_group = st.session_state.groups[group_label]
-                existing_group.group_df = group_df.copy()
+            #    existing_group = st.session_state.groups[group_label]
+            #    existing_group.group_df = group_df.copy()
             
             current_groups[group_label] = st.session_state.groups[group_label]
         
@@ -239,6 +239,6 @@ if __name__ == "__main__":
     # Create and render GroupUi
     ui = GroupUi(st.session_state.bayes_manager)
     ui.render_all()
-    ui.show_data_stats()
+   # ui.show_data_stats()
     
 
