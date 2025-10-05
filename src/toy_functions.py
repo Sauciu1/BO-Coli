@@ -4,6 +4,7 @@ import torch
 from torch import Tensor
 import pandas as pd
 import numpy as np
+from src.ax_helper import dtype
 
 
 def sinc(x: Tensor) -> Tensor:
@@ -68,11 +69,11 @@ class ResponseFunction:
 
             
         if isinstance(coord, pd.Series):
-            coord = torch.tensor(coord.iloc[:].astype(float).values, dtype=torch.float64)
+            coord = torch.tensor(coord.iloc[:].astype(float).values, dtype=dtype)
         elif isinstance(coord, np.ndarray):
-            coord = torch.tensor(coord, dtype=torch.float64)
+            coord = torch.tensor(coord, dtype=dtype)
         elif not isinstance(coord, Tensor):
-            coord = torch.tensor(coord, dtype=torch.float64)
+            coord = torch.tensor(coord, dtype=dtype)
 
         if coord.shape[0] != self.n_dim:
             raise ValueError(f"Coordinate first dimension {coord.shape[0]} does not match expected {self.n_dim}")
@@ -103,19 +104,19 @@ class Hartmann6D:
     def __init__(self):
 
 
-        self._h6_alpha = torch.tensor([1.0, 1.2, 3.0, 3.2])
+        self._h6_alpha = torch.tensor([1.0, 1.2, 3.0, 3.2], dtype=dtype)
         self._h6_A = torch.tensor([
             [10,  3, 17,  3,  1, 11],
             [ 0.05, 10, 17,  0.1, 8, 14],
             [ 3,  3.5, 1.7, 10, 17, 8],
             [17,  8,  0.05, 10, 0.1, 14],
-        ])
+        ], dtype=dtype)
         self._h6_P = 1e-4 * torch.tensor([
             [1312, 1696, 5569, 124, 8283, 5886],
             [2329, 4135, 8307, 3736, 1004, 9991],
             [2348, 1451, 3522, 2883, 3047, 6650],
             [4047, 8828, 8732, 5743, 1091, 381],
-        ])
+        ], dtype=dtype)
 
 
     def eval_at(self, x1, x2, x3, x4, x5, x6):
@@ -127,9 +128,9 @@ class Hartmann6D:
         """
         args = (x1, x2, x3, x4, x5, x6)
         if len(args) == 1 and hasattr(args[0], "__len__"):
-            x = torch.as_tensor(args[0], dtype=torch.float32)
+            x = torch.as_tensor(args[0], dtype=dtype)
         else:
-            x = torch.as_tensor(args, dtype=torch.float32)
+            x = torch.as_tensor(args, dtype=dtype)
         if x.shape != (6,):
             raise ValueError("hartmann6 expects 6-dimensional input.")
         
@@ -144,7 +145,7 @@ if __name__ == "__main__":
               torch.linspace(0, 20, 100), torch.linspace(0, 20, 100), torch.linspace(0, 20, 100)]
     test_func = ResponseFunction(six_curve_sum, n_dim=6)
 
-    t = torch.tensor([1, 2, 3, 4, 5, 6], dtype=torch.float32)
+    t = torch.tensor([1, 2, 3, 4, 5, 6], dtype=dtype)
     print(t)
     print(t.shape)
 

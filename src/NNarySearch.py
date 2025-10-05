@@ -3,6 +3,7 @@ from IPython.display import display
 from typing import Literal, List, Tuple
 import pandas as pd
 import src.distribution_functions
+from src.ax_helper import dtype
 
 
 class NNarySearch:
@@ -26,9 +27,9 @@ class NNarySearch:
         """Indexes and normalizes data"""
         if isinstance(data, pd.Series):
             self.indices = data.index
-            data = torch.tensor(data.values, dtype=torch.float32)
+            data = torch.tensor(data.values, dtype=dtype)
         elif not isinstance(data, torch.Tensor):
-            data = torch.tensor(data, dtype=torch.float32)
+            data = torch.tensor(data, dtype=dtype)
             self.indices = torch.arange(len(data))
         else:
             self.indices = torch.arange(len(data))
@@ -53,7 +54,7 @@ class NNarySearch:
         range_size = end - start
         
         # Create power-based region sizes
-        reg_sizes = torch.tensor([self.split_power**i for i in range(self.n)], dtype=torch.float32)
+        reg_sizes = torch.tensor([self.split_power**i for i in range(self.n)], dtype=dtype)
         
         # Normalize region sizes to fit within range
         total_units = reg_sizes.sum().item()

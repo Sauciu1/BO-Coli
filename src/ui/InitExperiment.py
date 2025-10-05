@@ -40,7 +40,7 @@ class InitExperiment:
         """Choose the Gaussian Process model for the experiment"""
         gp_options = list(BayesClientManager.gp_options.keys())
         if "selected_gp" not in st.session_state:
-            st.session_state.selected_gp = "SingleTaskGP"
+            st.session_state.selected_gp = gp_options[0]
 
         st.session_state.selected_gp = st.selectbox(
             "Select a Gaussian Process model:",
@@ -252,6 +252,9 @@ class InitExperiment:
             response_label = "response",
             bounds = params
         )
+
+        bayes_manager._experiment_name = self.experiment_name
+
         bayes_manager.gp = self.selected_gp
         bayes_manager.acquisition_function = self.selected_acquisition_function
         return bayes_manager

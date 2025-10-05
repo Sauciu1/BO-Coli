@@ -429,6 +429,10 @@ class BayesClientManager:
         """Initialize BayesClientManager from a pickle file, handling module path changes."""
         return CompatibleUnpickler(file).load()
     
+    @property
+    def experiment_name(self):
+        return getattr(self, "_experiment_name", "new_experiment")
+    
 
 import pickle
 
@@ -455,6 +459,8 @@ class CompatibleUnpickler(pickle.Unpickler):
                 pass
         
         return super().find_class(module, name)
+
+
 
         
 

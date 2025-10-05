@@ -152,9 +152,9 @@ class GPVisualiser:
     ) -> float:
         """Calculate Euclidean distance between two points."""
         if not isinstance(point1, Tensor):
-            point1 = torch.tensor(point1)
+            point1 = torch.tensor(point1, dtype=dtype)
         if not isinstance(point2, Tensor):
-            point2 = torch.tensor(point2)
+            point2 = torch.tensor(point2, dtype=dtype)
         return torch.dist(point1, point2).item()
     
     def get_best_observed_coord(self) -> pd.Series:
@@ -180,9 +180,9 @@ class GPVisualiser:
 
         # Normalize coordinates into a torch.Tensor (avoid torch.tensor(tensor))
         if isinstance(coordinates, pd.Series):
-            coordinates = torch.tensor(coordinates)
+            coordinates = torch.tensor(coordinates, dtype=dtype)
         elif isinstance(coordinates, np.ndarray):
-            coordinates = torch.tensor(coordinates)
+            coordinates = torch.tensor(coordinates, dtype=dtype)
 
 
         self.fig, axs = self._create_subplots(figsize=figsize)

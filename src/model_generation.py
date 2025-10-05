@@ -4,6 +4,7 @@ from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.priors import GammaPrior
 import torch
 
+dtype = torch.float64
 
 class GammaNoiseSGP(SingleTaskGP):
     """Just add a lot of assumed noise"""
@@ -62,7 +63,7 @@ class HeteroNoiseSGP(SingleTaskGP):
             y_std = flat_y[mask].std()
 
             std_list.append(y_std)
-        std_list = torch.tensor(std_list)
+        std_list = torch.tensor(std_list, dtype=dtype)
         std_unique = std_list
         std_for_X = std_unique[inverse].to(train_Y.dtype).to(train_Y.device)
         return std_unique, std_for_X, n_counts, inverse
