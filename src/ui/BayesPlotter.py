@@ -266,10 +266,12 @@ class UiBayesPlotter:
                     points="all",
                     title="Group Performance Distribution",
                 )
+
+                
                 fig.update_traces(boxmean="sd")
                 fig.update_layout(
                     xaxis_title="Group",
-                    yaxis_title=self.bayes_manager.response_label,
+                    yaxis_title="Response",
                     legend_title="Group",
                     margin=dict(l=10, r=10, t=60, b=40),
                 )

@@ -274,22 +274,26 @@ class GPVisualiserMatplotlib(GPVisualiser):
             return
         elif len(x)==1:
             x, mean, std, sizes = [x], [mean], [std], [sizes]
+       # group_labels = 
 
 
         # Plot each predicted point as a separate error bar
         for xi, mi, si, sz in zip(x, mean, std, sizes):
-                ax.errorbar(
-                    xi,
-                    mi,
-                    yerr=2 * si,
-                    fmt='',
-                    color='red',
-     
-                    alpha=0.3,
-                    linewidth=sz * 1+0.1,
-                    capsize=sz * 1+0.1,
-                    label='Predicted (selected point)',
+            ax.errorbar(
+                xi,
+                mi,
+                yerr=2 * si,
+                fmt='',
+                color='red',
+    
+                alpha=0.3,
+                linewidth=sz * 1+0.1,
+                capsize=sz * 1+0.1,
+                label='Predicted observation',
+                picker=True,
+                gid=f"Group: Predicted observation | x={float(xi):.3g}, y={float(mi):.3g}"
                 )
+
 
     @staticmethod
     def _plot_gp(grid: Tensor, mean: Tensor, std: Tensor, ax: plt.Axes, coordinates):

@@ -234,7 +234,10 @@ class BayesClientManager:
         """Get the coordinates of the best-performing observation"""
         if self.agg_stats.empty:
             return None
-        best_idx = self.agg_stats["mean"].idxmax()
+        if self.objective_direction == "minimise":
+            best_idx = self.agg_stats["mean"].idxmin()
+        else:
+            best_idx = self.agg_stats["mean"].idxmax()
         return self.agg_stats.loc[best_idx, self.feature_labels].to_dict()
 
     def get_best_group(self):
@@ -264,14 +267,13 @@ class BayesClientManager:
 
         for _, row in self.data.iterrows():
             params = {label: row[label] for label in self.feature_labels}
+            trial_index = client.attach_trial(parameters=params)
             if not np.isnan(row[self.response_label]):
-                trial_index = client.attach_trial(parameters=params)
                 client.complete_trial(
                     trial_index=trial_index,
                     raw_data={self.response_label: row[self.response_label]},
                 )
-            else:
-                client.attach_trial(parameters=params)
+
         return client
 
     def retrieve_data_from_client(self, client: Client):
@@ -498,3 +500,4 @@ if __name__ == "__main__":
     manger = example_manager()
     import pickle
     pickle.dump(manger, open("data/example_manager.pkl", "wb"))
+    print("Example manager saved to data/example_manager.pkl")

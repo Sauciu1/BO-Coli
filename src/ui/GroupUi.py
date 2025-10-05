@@ -145,23 +145,25 @@ class GroupUi:
             batch_size = st.number_input("Batch Size", min_value=1, value=1, step=1)
         with cols[1]:
             if target_button := st.button("Get New Targets", disabled=False):
-                with st.spinner("Generating targets..."):
-                    try:
-                        # First, sync all current groups to manager to preserve any unsaved changes
+                def sync_command():
                         self.sync_all_groups_to_manager()
                         
-                        # Get new targets from BayesClientManager
                         self.bayes_manager.get_batch_targets(batch_size)
                         
                         # Clear cached groups to force refresh with new data
                         st.session_state.groups = {}
                         st.rerun(scope='fragment')
-                    except Exception as e:
-                        st.error(f"Error generating targets: {str(e)}")
-                        st.error("The model needs more data or has fully explored the space.")
 
-            
-    
+
+ 
+                try:
+                    sync_command()
+                    st.success("New targets generated!")
+                except Exception as e:
+
+                    st.error(f"Error generating targets: {str(e)}")
+                    st.error("The model needs more data or has fully explored the space. Please add more data or generate smaller batches.")
+
 
     @st.fragment
     def show_data_stats(self):
@@ -210,6 +212,7 @@ class GroupUi:
         """Synchronize all group changes back to the BayesClientManager"""
         for group in self.groups.values():
             group.write_data_to_manager()
+        return group
 
 
 if __name__ == "__main__":
