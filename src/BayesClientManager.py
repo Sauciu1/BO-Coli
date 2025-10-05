@@ -6,7 +6,7 @@ from botorch.acquisition import qLogExpectedImprovement, qExpectedImprovement
 from ax import Client
 from src import ax_helper
 import numpy as np
-from src.model_generation import HeteroWhiteSGP
+from src.model_generation import HeteroWhiteSGP, GammaNoiseSGP
 
 class BayesClientManager:
 
@@ -31,9 +31,9 @@ class BayesClientManager:
 
         self._objective_direction = "maximise"  # or "minimise"
 
-    acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement, "qExpectedImprovement": qExpectedImprovement}
+    acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement}
 
-    gp_options = {"SingleTaskGP": SingleTaskGP, "HeteroWhiteSGP": HeteroWhiteSGP}
+    gp_options = {"SingleTaskGP": SingleTaskGP, "HeteroWhiteSGP": HeteroWhiteSGP, "GammaNoiseSGP": GammaNoiseSGP}
 
     @property
     def objective_direction(self):
@@ -316,12 +316,7 @@ class BayesClientManager:
 
         # Get the updated data from client (this includes new targets)
         raw_new_data = self.retrieve_data_from_client(client)
-        
-        # The problem is that retrieve_data_from_client generates new unique IDs
-        # We need to preserve the original unique IDs and only generate IDs for truly new trials
-        
-        # Match existing data by unique_id to preserve individual trial responses
-        # Create a mapping of parameter combinations to original data for proper matching
+
         combined_data = []
         
         # Create a list to track which original rows have been matched
@@ -388,7 +383,7 @@ class BayesClientManager:
                 f"Coordinates length {len(coords)} does not match number of features {len(self.feature_labels)}"
             )
         
-        # Find rows with matching coordinates
+
         feature_data = self.data[self.feature_labels].to_numpy()
         matching_mask = np.all(feature_data == coords, axis=1)
         matching_rows = self.data[matching_mask]

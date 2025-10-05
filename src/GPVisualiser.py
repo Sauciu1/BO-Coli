@@ -255,7 +255,16 @@ class GPVisualiser:
 
     def _plot_expected_improvement():
         raise NotImplementedError
+    
+    @classmethod
+    def init_from_client(cls, client: Client, gp =None):
+        """Initialize GPVisualiser from raw data and a GP constructor. Legacy hook for backwards compatibility."""
+        from botorch.models import SingleTaskGP
 
+        bayes_manager = BayesClientManager.init_from_client(client)
+        if gp is not None:
+            bayes_manager._gp = gp
+        return cls(bayes_manager=bayes_manager)
 
 
 
@@ -477,8 +486,8 @@ class GPVisualiserPlotly(GPVisualiser):
                 x=0.5,
                 xanchor='center'
             ),
-            height=400 * self.subplot_dims[0],
-            width=600 * self.subplot_dims[1],
+            height=int(400 * self.subplot_dims[0] * 2),
+            width=int(600 * self.subplot_dims[1] * 1.5),
             showlegend=True,
             legend=dict(
                 x=1.02,
@@ -523,7 +532,7 @@ class GPVisualiserPlotly(GPVisualiser):
             row=ax.row, col=ax.col
         )
 
-    def plot_all(self, coordinates: list[float] | Tensor | pd.Series, linspace=None, figsize=(12, 6)):
+    def plot_all(self, coordinates: list[float] | Tensor | pd.Series, linspace=None, figsize=(24, 12), render = False):
         """Handle plotting all dimensions using Plotly subplots."""
         
         if coordinates is None:
@@ -560,6 +569,7 @@ class GPVisualiserPlotly(GPVisualiser):
 
         rounded_coords = [f"{x:.3g}" for x in coordinates]
         self._add_subplot_elements(rounded_coords)
+        self.fig.show() if render else None
 
         return self.fig, axs
 

@@ -473,22 +473,16 @@ class BatchClientHandler:
         return obs
 
     def plot_GP(self, gp: callable, coords=None, **kwargs):
-        from .GPVisualiser import GPVisualiserMatplotlib
+        from .GPVisualiser import GPVisualiserPlotly
 
         obs = self.get_batch_observations()
-        plotter = GPVisualiserMatplotlib(
-            gp,
-            obs,
-            self.dim_names,
-            self.response_col,
-            feature_range_params=self.range_params,
-        )
-
+        plotter = GPVisualiserPlotly.init_from_client(self.client, gp)
+ 
         if coords is None:
             coords = obs.loc[obs[self.response_col].idxmax(), self.dim_names].tolist()
 
-        plotter.plot_all(coords, **kwargs)
-        return plotter
+        plotter.plot_all(coords, **kwargs, render = False)
+        return plotter.fig
 
     def comp_noise_and_repeats(
         self,
