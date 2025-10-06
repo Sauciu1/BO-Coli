@@ -88,7 +88,7 @@ class BayesPlotter:
                 st.session_state["target_coords"] = group_coords
 
     @st.fragment
-    def choose_plot_coordinates(self):
+    def _plot_handler(self):
         """Allows user to manually set coordinates for plotting the GP"""
 
         columns = st.columns([0.3, 0.3, 0.5])
@@ -230,6 +230,7 @@ class BayesPlotter:
         else:
             raise ValueError("Bounds are not defined in the BayesClientManager.")
 
+   # @check_plot_ready
     @property
     def plot_coords(self):
         """Get current plotting coordinates from sliders or bayes_manager."""
@@ -240,7 +241,11 @@ class BayesPlotter:
                 coords.append(st.session_state[slider_key])
             else:
                 # Fallback to bayes_manager default coordinates
-                default_coords = self.bayes_manager.get_best_coordinates()
+                if hasattr(self.bayes_manager, 'get_best_coordinates'):
+                    default_coords = self.bayes_manager.get_best_coordinates()
+                else:
+                    default_coords = [0.0] * len(self.bayes_manager.feature_labels)
+                    
                 if default_coords and param in default_coords:
                     coords.append(default_coords[param])
                 else:
@@ -248,19 +253,12 @@ class BayesPlotter:
                     bounds = self.bounds[param]
                     coords.append((bounds["lower_bound"] + bounds["upper_bound"]) / 2)
         return coords
+            
 
     @check_plot_ready
     def plot_gaussian_process(self, gp_model=SingleTaskGP, coords=None):
         """Plot the Gaussian Process using GPVisualiserPlotly"""
-        if not self.bayes_manager.has_response:
-            st.warning("No observations available to plot the GP.")
-            return
-        if self.bayes_manager is None or gp_model is None:
-            st.error("Bayesian manager or GP model not provided.")
-            return
-        elif not self.bayes_manager.has_response:
-            st.warning("No observations available to plot the GP.")
-            return
+
 
         plotter = GPVisualiserPlotly(self.bayes_manager)
 
@@ -324,7 +322,7 @@ class BayesPlotter:
         with st.expander("📈 Plot Group Performance", expanded=True):
             self.plot_group_performance()
         with st.expander("📊 Plot GP at Specific Coordinates", expanded=True):
-            self.choose_plot_coordinates()
+            self._plot_handler()
 
 
 if __name__ == "__main__":
