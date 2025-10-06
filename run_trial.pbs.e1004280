@@ -1,0 +1,246 @@
+
+ArgumentError: one of the arguments -n/--name -p/--prefix is required
+
+
+
+==> WARNING: A newer version of conda exists. <==
+    current version: 25.3.1
+    latest version: 25.7.0
+
+Please update conda by running
+
+    $ conda update -n base -c conda-forge conda
+
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed on the second try, after generating a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .'), OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed on the second try, after generating a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .'), OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed on the second try, after generating a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed on the second try, after generating a new set of initial conditions.
+
+/rds/general/user/ha1822/home/miniforge3/envs/bo_coli/lib/python3.13/site-packages/botorch/optim/optimize.py:753: RuntimeWarning:
+
+Optimization failed in `gen_candidates_scipy` with the following warning(s):
+[OptimizationWarning('Optimization failed within `scipy.optimize.minimize` with status 2 and message ABNORMAL: .')]
+Trying again with a new set of initial conditions.
+
