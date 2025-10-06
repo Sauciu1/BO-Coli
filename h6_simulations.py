@@ -70,7 +70,7 @@ def run_grid(save_path):
         for rerun in range(10)
     ]
     
-    param_grid = test_local_param_grid
+    #param_grid = test_local_param_grid
 
     t0 = time.perf_counter()
     print("Starting batch Bayesian optimization tests...")
@@ -110,7 +110,7 @@ def run_grid(save_path):
 
 if __name__ == "__main__":
     save_dir = "data/bayes_sim/"
-    save_PATH = save_dir + 'trial1_HeteroWhite_HPC_10_06.pkl'
+    save_PATH = save_dir + 'trial2_HeteroWhite_HPC_10_06.pkl'
 
     run_grid(save_PATH)
     # Runtime for sequential runs : 112s
