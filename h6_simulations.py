@@ -46,17 +46,31 @@ print(__name__)
 mode = 'multicore'
 
 def run_grid(save_path):
-    #param_grid = [(tr, n, f"again_{again}") for tr in range(1, 10, 2) for n in np.linspace(0, 1.1, 6) for again in range(1, 7)]
+    test_local_param_grid = [
+        {
+            "technical_repeats": technical_repeats,
+            "noise": noise,
+            "cycles": cycles,
+            "batches": batch,
+            "rerun": rerun
+        }
+        for technical_repeats in [1, 4]
+        for noise in [3.4 * x for x in [0.0, 0.1]]
+        for batch in [1]
+        for cycles in [20]
+        for rerun in range(10)
+    ]
 
     param_grid = [
-        {"technical_repeats":technical_repeats, "noise":noise, "cycles":cycles, "batches":batch}
+        {"technical_repeats":technical_repeats, "noise":noise, "cycles":cycles, "batches":batch, "rerun":rerun}
         for technical_repeats in [1, 2, 4, 8]
         for noise in [3.4* x for x in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]]
         for batch in [1]
-        for cycles in [80]
+        for cycles in [60]
         for rerun in range(10)
     ]
     
+    #param_grid = test_local_param_grid
 
     t0 = time.perf_counter()
     print("Starting batch Bayesian optimization tests...")
@@ -76,7 +90,7 @@ def run_grid(save_path):
 
     def dict_key(d: dict) -> str:
         # Create a stable, hashable, human-readable key
-        return "|".join(f"{k}={d[k]}" for k in sorted(d))
+        return "|".join(f"{key}={val}" for key, val in d.items())
 
     with mp.get_context("spawn").Pool(processes=n_workers) as pool:
         jobs = []
@@ -96,7 +110,7 @@ def run_grid(save_path):
 
 if __name__ == "__main__":
     save_dir = "data/bayes_sim/"
-    save_PATH = save_dir + 'HeteroWhite_sequential_09_31.pkl'
+    save_PATH = save_dir + 'HeteroWhite_HPC_10_06.pkl'
 
     run_grid(save_PATH)
     # Runtime for sequential runs : 112s

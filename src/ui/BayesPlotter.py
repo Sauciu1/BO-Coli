@@ -21,7 +21,11 @@ class BayesPlotter:
         """Decorator to ensure the bayes_manager is synced and has response data before plotting"""
 
         def _inner_function(self, *args, **kwargs):
-            self.bayes_manager.sync_self()
+            if hasattr(self.bayes_manager, 'sync_self'):
+                self.bayes_manager.sync_self()
+            else:
+                st.error("Bayesian manager fails to sync. Running with existing data.")
+   
             if self.bayes_manager.has_response:
                 return passed_function(self, *args, **kwargs)
             else:

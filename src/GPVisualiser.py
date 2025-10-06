@@ -320,8 +320,13 @@ class GPVisualiserMatplotlib(GPVisualiser):
 
     def _add_subplot_elements(self, rounded_coords):
         # Use the Figure's suptitle so we don't rely on pyplot state
+        # Center and bold the suptitle
         self.fig.suptitle(
-            f"GP Along Each Dimension for point {rounded_coords}", fontsize=16
+            f"GP Along Each Dimension for point {rounded_coords}",
+            fontsize=20,
+            fontweight='bold',
+            x=0.5,
+            ha='center'
         )
 
         handles, labels = self.fig.axes[0].get_legend_handles_labels()
@@ -468,39 +473,45 @@ class GPVisualiserPlotly(GPVisualiser):
         subplot_titles = [f"GP along {col}" for col in self.obs_X.columns]
         
         fig = make_subplots(
-            rows=rows, 
+            rows=rows,
             cols=cols,
             subplot_titles=subplot_titles,
             vertical_spacing=0.1,
-            horizontal_spacing=0.05
+            horizontal_spacing=0.05,
         )
-        
+
+
+        width_px = int(figsize[0] * 100)
+        height_px = int(figsize[1] * 100)
+
+
+        fig.update_layout(width=width_px, height=height_px)
+
         # Create wrapper objects for each subplot
         axs = []
         for i in range(self.obs_X.shape[1]):
             row = (i // cols) + 1
             col = (i % cols) + 1
             axs.append(PlotlyAxWrapper(fig, row, col))
-        
+
         return fig, axs
 
     def _add_subplot_elements(self, rounded_coords):
         # Update layout
+        # Only set title and legend here; sizing is handled in _create_subplots
         self.fig.update_layout(
             title=dict(
                 text=f"GP Along Each Dimension for point {rounded_coords}",
                 x=0.5,
-                xanchor='center'
+                xanchor='center',
             ),
-            height=int(400 * self.subplot_dims[0] * 2),
-            width=int(600 * self.subplot_dims[1] * 1.5),
             showlegend=True,
             legend=dict(
                 x=1.02,
                 y=0.5,
                 xanchor="left",
-                yanchor="middle"
-            )
+                yanchor="middle",
+            ),
         )
 
         # Add legend by making first occurrence of each trace name visible

@@ -6,8 +6,7 @@ WORKDIR /app
 
 COPY src/ ./src/
 COPY pyproject.toml ./
-COPY poetry.lock ./
-COPY .streamlit/ ./.streamlit/
+
 
 
 
