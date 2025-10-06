@@ -17,8 +17,9 @@ The package provides a no-code solution for running Bayesian Experiments. All in
 To deploy BOColi, you first need docker installed on your system:
 **CHANGE THIS TO WHERE IS IT STORED ON THE WIKI**
 ``` bash
-cd BO-Coli
+
 git clone https://github.com/Sauciu1/BO-Coli
+cd BO-Coli
 docker build -t bo_coli:v8 .
 ```
 
