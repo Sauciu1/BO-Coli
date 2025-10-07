@@ -269,9 +269,10 @@ class BayesPlotter:
         fig, ax = plotter.plot_all(coordinates=coords)
         fig.update_layout(title=None)
 
-        st.write(f"### Gaussian Process Visualization at parameters({', '.join(map(str, coords))})")
-        st.write("**GP visualization is shown as parallel to an axis**. " \
-        "Elements farther from the plane are smaller in size.")
+        param_str = ", ".join(f"{param}={value:.4g}" for param, value in zip(self.bayes_manager.feature_labels, coords))
+        st.write(f"### Gaussian Process Visualization at parameter point ({param_str})")
+        st.write("**GP visualization is shown as slice parallel to a parameter vs response plane**. " \
+        "Elements farther from the plane slice are smaller in size.")
         st.plotly_chart(
             fig,
             use_container_width=True,

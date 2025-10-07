@@ -38,7 +38,7 @@ class InitExperiment:
     @st.fragment
     def _choose_gaussian_process(self):
         """Choose the Gaussian Process model for the experiment"""
-        gp_options = list(BayesClientManager.gp_options.keys())
+        gp_options = list(BayesClientManager.gp_options.fget().keys())
         if "selected_gp" not in st.session_state:
             st.session_state.selected_gp = gp_options[0]
 
@@ -56,7 +56,7 @@ class InitExperiment:
         if "selected_acq" not in st.session_state:
             st.session_state.selected_acq = "qLogExpectedImprovement"
 
-        acqf_options = list(BayesClientManager.acq_f_options.keys())
+        acqf_options = list(BayesClientManager.acq_f_options.fget().keys())
 
         st.session_state.selected_acq = st.selectbox(
             "Select an acquisition function:",

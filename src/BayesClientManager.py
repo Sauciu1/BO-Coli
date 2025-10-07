@@ -7,6 +7,7 @@ from ax import Client
 from src import ax_helper
 import numpy as np
 from src.model_generation import HeteroWhiteSGP, GammaNoiseSGP
+from src.gp_and_acq_f import BocoliClassLoader
 
 class BayesClientManager:
 
@@ -21,6 +22,11 @@ class BayesClientManager:
         self.feature_labels = feature_labels
         self.response_label = response_label
 
+        loader = BocoliClassLoader()
+        # Use the richer info dicts (name -> {class,type,description})
+        self.gp_options = loader.gaussian_process_info
+        self.acq_f_options = loader.acquisition_function_info
+
         self.group_label = "group"
         self.id_label = "unique_id"
         self.data = self._preprocess_data(data)
@@ -31,11 +37,23 @@ class BayesClientManager:
 
         self._objective_direction = "maximise"  # or "minimise"
 
-        self.resync_self:callable = None
+        self.resync_self = None
 
-    acq_f_options = {"qLogExpectedImprovement": qLogExpectedImprovement}
+    @staticmethod
+    @property
+    def gp_options():
+        """overwrites to dict once instantiated to allow access without instantiation"""
+        loader = BocoliClassLoader()
+        return loader.gaussian_process_info
+    
+    @staticmethod
+    @property
+    def acq_f_options():
+        """overwrites to dict once instantiated to allow access without instantiation"""
+        loader = BocoliClassLoader()
+        return loader.acquisition_function_info
 
-    gp_options = {"HeteroWhiteSGP": HeteroWhiteSGP, "SingleTaskGP": SingleTaskGP, "GammaNoiseSGP": GammaNoiseSGP}
+
 
     @property
     def objective_direction(self):
@@ -167,7 +185,10 @@ class BayesClientManager:
     def gp(self):
         """Initialize and return the Gaussian Process model"""
         if not hasattr(self, "_gp"):
-            self._gp = list(self.gp_options.values())[0]
+            # take the first configured GP info and use its class
+
+            first = next(iter(self.gp_options.values()))
+            self._gp = first["class"]
         return self._gp
 
     @gp.setter
@@ -176,13 +197,14 @@ class BayesClientManager:
             raise ValueError(
                 f"GP model '{gp_name}' not recognized. Available models: {list(self.gp_options.keys())}"
             )
-        self._gp = self.gp_options[gp_name]
+        self._gp = self.gp_options[gp_name]["class"]
 
     @property
     def acquisition_function(self):
         """Initialize and return the acquisition function"""
         if not hasattr(self, "_acquisition_function"):
-            self._acquisition_function = qLogExpectedImprovement
+            first = next(iter(self.acq_f_options.values()))
+            self._acquisition_function = first["class"]
         return self._acquisition_function
 
     @acquisition_function.setter
@@ -191,7 +213,7 @@ class BayesClientManager:
             raise ValueError(
                 f"Acquisition function '{acq_f_name}' not recognized. Available functions: {list(self.acq_f_options.keys())}"
             )
-        self._acquisition_function = self.acq_f_options[acq_f_name]
+        self._acquisition_function = self.acq_f_options[acq_f_name]["class"]
 
     @property
     def X(self):
@@ -500,7 +522,13 @@ def example_manager():
         response_label=response_label,
         bounds=bounds,
     )
+
+    manager.gp = "HeteroWhiteSGP"
+    manager.acquisition_function = "qLogExpectedImprovement"
+    
     return manager
+
+
 
 
 if __name__ == "__main__":

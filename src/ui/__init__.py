@@ -32,6 +32,7 @@ from .GroupUi import GroupUi
 from .SingleGroup import SingleGroup
 from .BayesPlotter import BayesPlotter
 
+
 # Export main classes for public API
 __all__ = [
     'ExperimentInitialiser',
@@ -39,8 +40,9 @@ __all__ = [
     'GroupUi',
     'SingleGroup',
     'BayesPlotter',
+    'gp_and_acq_f_loader',
 ]
 
 # Version info
 __version__ = '1.0.0'
-__author__ = 'BO-Coli Development Team'
+__author__ = 'Povilas Sauciuvienas'

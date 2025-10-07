@@ -189,8 +189,9 @@ class GroupUi:
 
             st.error(f"Error generating targets: {str(e)}")
             st.error(
-                "The model needs more data or has fully explored the space."
-                + " Please add more data or generate smaller batches."
+                """The model needs more data or cannot generate sufficiently salient points.
+                Please add more data or generate smaller batches.
+                Subsequent generation may be required to reach desired batch size."""
             )
 
     @st.fragment
