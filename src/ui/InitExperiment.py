@@ -5,6 +5,7 @@ import streamlit as st
 import ax
 
 import numpy as np
+from src.gp_and_acq_f import BocoliClassLoader
 
 
 class InitExperiment:
@@ -12,6 +13,13 @@ class InitExperiment:
         self.bayes_manager = Bayes_manager
 
         self.experiment_parameters = {}
+
+        loader = BocoliClassLoader()
+        self.gp_info = loader.gaussian_process_info
+        self.acq_f_info = loader.acquisition_function_info
+
+        self.gp_options = list(self.gp_info.keys())
+        self.acq_f_options = list(self.acq_f_info.keys())
 
 
 
@@ -38,15 +46,28 @@ class InitExperiment:
     @st.fragment
     def _choose_gaussian_process(self):
         """Choose the Gaussian Process model for the experiment"""
-        gp_options = list(BayesClientManager.gp_options.fget().keys())
-        if "selected_gp" not in st.session_state:
-            st.session_state.selected_gp = gp_options[0]
+        # Use the loader to retrieve rich info (including descriptions)
+        # Use preloaded metadata
 
-        st.session_state.selected_gp = st.selectbox(
+
+        if "selected_gp" not in st.session_state:
+            st.session_state.selected_gp = self.gp_options[0] if self.gp_options else None
+        current_desc = self.gp_info.get(st.session_state.selected_gp, {}).get("description", "no description")
+
+        # Let Streamlit manage the selected value via the `key` argument to avoid
+        # overwriting session_state on every rerun which can cause the selection
+        # to revert to a previous value.
+        st.selectbox(
             "Select a Gaussian Process model:",
-            list(gp_options),
-            index=list(gp_options).index(st.session_state.selected_gp),
+            self.gp_options,
+            index=self.gp_options.index(st.session_state.selected_gp) if st.session_state.selected_gp in self.gp_options else 0,
+            help=current_desc,
+            key="selected_gp",
         )
+
+        selected = st.session_state.get("selected_gp", None)
+        if selected in self.gp_info:
+            st.caption(self.gp_info[selected]["description"])
 
 
 
@@ -54,15 +75,20 @@ class InitExperiment:
     def _choose_acquisition_function(self):
         """Choose Acquisition Function"""
         if "selected_acq" not in st.session_state:
-            st.session_state.selected_acq = "qLogExpectedImprovement"
+            st.session_state.selected_acq = self.acq_f_options[0]
+        current_desc = self.acq_f_info.get(st.session_state.selected_acq, {}).get("description", "no description")
 
-        acqf_options = list(BayesClientManager.acq_f_options.fget().keys())
-
-        st.session_state.selected_acq = st.selectbox(
+        st.selectbox(
             "Select an acquisition function:",
-            list(acqf_options),
-            index=list(acqf_options).index(st.session_state.selected_acq),
+            self.acq_f_options,
+            index=self.acq_f_options.index(st.session_state.selected_acq) if st.session_state.selected_acq in self.acq_f_options else 0,
+            help=current_desc,
+            key="selected_acq",
         )
+
+        selected_aq = st.session_state.get("selected_acq", None)
+        if selected_aq in self.acq_f_info:
+            st.caption(self.acq_f_info[selected_aq]["description"])
 
 
 
