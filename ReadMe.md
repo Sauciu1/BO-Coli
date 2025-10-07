@@ -12,18 +12,18 @@ The package provides a no-code solution for running Bayesian Experiments. All in
 
 ## Local Deployment
 
-To deploy BOColi, you first need [docker](https://www.docker.com/) and [git](https://git-scm.com/downloads) installed on your system:
+To deploy BOColi, you first need [docker](https://www.docker.com/) and [git](https://git-scm.com/downloads) installed on your system. Please don't forget to start docker.
 **CHANGE THIS TO WHERE IS IT STORED ON THE WIKI**
 ``` bash
-git clone https://github.com/Sauciu1/bo-coli
-cd bo-coli
-docker build -t bo_coli:v9 .
+git https://gitlab.igem.org/2025/software-tools/imperial
+cd imperial
+docker build -t bo_coli:v10 .
 ```
 
-This will take ~10 minutes to compile, afterwards it can be rapidly deployed and accessed from your browser:
+This will take ~10 minutes to compile, afterwards it can be rapidly deployed and accessed from your browser after starting docker and running the image.
 
 ``` bash
-docker run -p 8989:8989 bo_coli:v9
+docker run -p 8989:8989 bo_coli:v10
 ```
 
 The link to the applet for your browser is then gonna be.
