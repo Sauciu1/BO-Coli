@@ -54,7 +54,6 @@ class BayesClientManager:
         return loader.acquisition_function_info
 
 
-
     @property
     def objective_direction(self):
         return self._objective_direction

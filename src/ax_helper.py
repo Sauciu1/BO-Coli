@@ -31,7 +31,7 @@ from ax.generation_strategy.transition_criterion import MinTrials
 from ax.adapter.registry import Generators
 
 from src.model_generation import HeteroWhiteSGP
-
+from src.BayesClientManager import BayesClientManager
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
@@ -125,146 +125,6 @@ def get_obs_from_client(client: Client) -> pd.DataFrame:
 
 
 
-class BayesClientManager():
-    def __init__(self, client:Client, gaussian_process=HeteroWhiteSGP, acqf_class=qLogExpectedImprovement):
-        self.client: Client = client
-        self.gaussian_process = gaussian_process
-        self.acqf_class = acqf_class
-
-
-        self.input_cols: list[str] = list(client._experiment.parameters.keys())
-        self.response_col: str = str(list(client._experiment.metrics.keys())[0])
-        self.group_label = None
-
-    @staticmethod
-    def init_from_json(json_path: str) -> Self:
-        client = Client().load_from_json_file(json_path)
-
-        return BayesClientManager(client)
-
-    @property   
-    def X(self) -> pd.DataFrame:
-        return self.df[self.input_cols]
-
-    @property
-    def y(self) -> pd.Series:
-        return self.df[self.response_col]
-    
-    @property
-    def df(self):
-        return get_obs_from_client(self.client)
-    
-    def get_new_targets_from_client(self, n_groups =1):
-        self.client.get_next_trials(max_trials=n_groups)
- 
-        return get_obs_from_client(self.client)
-    
-    def write_self_to_client(self):
-        """Regenerates the Ax client from the current data in self.df"""
-        
-        # Convert existing parameters to RangeParameterConfig format
-        range_parameters = []
-        for name, param in self.client._experiment.parameters.items():
-            # Check if parameter uses log scale
-            is_log_scale = getattr(param, 'log_scale', False)
-            range_param = RangeParameterConfig(
-                name=name,
-                parameter_type="float",
-                bounds=(param.lower, param.upper),
-                scaling="log" if is_log_scale else "linear"
-            )
-            range_parameters.append(range_param)
-
-        client = Client()
-        client.configure_experiment(parameters=range_parameters)
-        client.configure_optimization(objective=self.response_col)
-
-        generation_strategy = get_full_strategy(gp=self.gaussian_process, acqf_class=self.acqf_class)
-        client.set_generation_strategy(generation_strategy=generation_strategy)
-
-        df = self.get_batch_instance_repeat().sort_values(by=self.group_label, ascending=True)
-
-        # Include trial_name column if it exists, otherwise create trial names
-        if 'trial_name' in df.columns:
-            df = df[self.input_cols + [self.response_col, 'trial_name']]
-        else:
-            df = df[self.input_cols + [self.response_col]]
-            
-        for i, row in df.iterrows():
-            params = {col: row[col] for col in self.input_cols}
-            # Use trial_name if available, otherwise generate one
-            trial_name = row.get('trial_name', f'trial_{i}')
-            
-            if not pd.isna(row[self.response_col]):
-                client.attach_trial(parameters=params, arm_name=trial_name)
-                client.complete_trial(trial_index=i, raw_data={self.response_col: float(row[self.response_col])})
-            else:
-                client.attach_trial(parameters=params, arm_name=trial_name)
-
-
-        self.client = client
-        return self
-
-
-
-    def get_batch_instance_repeat(self):
-        """return grouped dataframe"""
-        df = self.df.copy()  # Create a copy to avoid modifying the original
-        
-        # Check if trial_name column exists
-        if 'trial_name' not in df.columns:
-            # If no trial_name column, create a simple group based on index
-            df['Group'] = 0  # All observations in one group
-            self.group_label = 'Group'
-            self.unique_trials = {0: 0}
-            return df
-        
-        trial_instance = df.loc[:, 'trial_name'].str.split('_').map(lambda x: x[0])
-        trial_dict = {trial: i for i, trial in enumerate(trial_instance.unique())}
-        
-        df['Group'] = trial_instance.map(trial_dict).astype(int)
-        self.unique_trials = trial_dict
-        self.group_label = 'Group'
-        return df
-    
-
-    
-    @property
-    def obs(self):
-        return self.df[self.input_cols + [self.response_col]]
-
-    def get_best_coordinates(self) -> dict:
-        if self.df.empty:
-            return None
-        best_row = self.df.loc[self.df[self.response_col].idxmax()]
-        return best_row[self.input_cols].to_dict()
-    
-    def get_parameter_ranges(self) -> dict:
-        bounds = list(self.client._experiment.parameters.values())
-        # Convert bounds array to dictionary with parameter names as keys
-        return {param_name: (bounds[i].lower, bounds[i].upper) for i, param_name in enumerate(self.input_cols)}
-    
-
-    def get_agg_info(self):
-        df = self.get_batch_instance_repeat()
-        if self.group_label is None or self.group_label not in df.columns:
-            # If no group label is set or column doesn't exist, return empty DataFrame
-            return pd.DataFrame(columns=["Group", "N", "Mean", "Std", *self.input_cols])
-        
-        # Aggregate response stats and carry along (unchanged) input columns.
-        # We assume each technical repeat group has identical parameter values.
-        agg_spec = {self.response_col: ["count", "mean", "std"]}
-        for col in self.input_cols:
-            agg_spec[col] = "first"
-
-        grouped = df.groupby(self.group_label).agg(agg_spec).reset_index()
-
-        # Flatten MultiIndex columns
-        new_cols = ["Group", *self.input_cols, "N observations", "Mean", "Std", ]
-        grouped.columns = new_cols
-
-        return grouped
-    
     
 
 
@@ -418,7 +278,6 @@ class UnitCubeScaler(BaseEstimator, TransformerMixin):
         else:
             n = 0
         return np.array([f"x{i}" for i in range(n)], dtype=object)
-    
 
 
 
@@ -517,7 +376,6 @@ class BatchClientHandler:
 from botorch.acquisition import qLogExpectedImprovement
 from botorch.models import SingleTaskGP
 
-
 class SequentialRuns:
     """Simulate sequential Bayesian optimization with batches and technical repeats.
 
@@ -540,13 +398,50 @@ class SequentialRuns:
         noise_fn=None,
         plot_each=False,
     ):
-        client = Client()
-        client.configure_experiment(parameters=self.range_parameters)
-        client.configure_optimization(objective=self.metric_name)
+        # Build or obtain an Ax Client depending on what was supplied as
+        # `range_parameters` during construction. Acceptable inputs are:
+        # - a BayesClientManager instance (will use its _create_ax_client()),
+        # - a dict of bounds in the format used by BayesClientManager,
+        # - a sequence of RangeParameterConfig objects.
+        client = None
+
+        def _bounds_dict_to_range_params(bounds: dict):
+            params = []
+            for name, cfg in bounds.items():
+                log = cfg.get("log_scale", False)
+                params.append(
+                    RangeParameterConfig(
+                        name=name,
+                        parameter_type="float",
+                        bounds=(cfg["lower_bound"], cfg["upper_bound"]),
+                        scaling="log" if log else "linear",
+                    )
+                )
+            return params
+
+        # If a manager-like object was passed in, ask it to create a client.
+        # Use duck-typing so both the manager defined here or an external
+        # `BayesClientManager` can be used interchangeably.
+        if hasattr(self.range_parameters, "_create_ax_client") and callable(
+            getattr(self.range_parameters, "_create_ax_client")
+        ):
+            manager = self.range_parameters
+            client = manager._create_ax_client()
+        else:
+            # If a bounds dict was passed
+            if isinstance(self.range_parameters, dict):
+                params = _bounds_dict_to_range_params(self.range_parameters)
+            else:
+                # assume it's already a sequence of RangeParameterConfig
+                params = self.range_parameters
+
+            client = Client()
+            client.configure_experiment(parameters=params)
+            client.configure_optimization(objective=self.metric_name)
 
         if noise_fn is None:
-            def noise_fn(x): return x
-        
+            def noise_fn(x):
+                return x
 
         generation_strategy = get_full_strategy(gp=gp, acqf_class=acqf_class)
         client.set_generation_strategy(generation_strategy=generation_strategy)
@@ -694,9 +589,52 @@ def get_above_percentile(df, max_val, percentile = 0.95):
 
 
 if __name__ == "__main__":
-    json_path = r"data/ax_clients/hartmann6_runs.json"
-    client = Client().load_from_json_file(json_path)
-    get_obs_from_client(client)
+    range_parameters = [
+    RangeParameterConfig(name="x1", parameter_type="float", bounds=(-2, 10))
+]
 
+metric_name = "response"
+dim_names = ["x1"]
+
+
+def test_function(x1):
+    # Original: y = -((x1 - 2) ** 2) + 10  -> range on [-2,10] is [-54, 10]
+    y = -((x1 - 2) ** 2) + 10
+    return (y + 54) / 64  # scale to [0,1]
+
+
+noise_fn = lambda x, y: y + np.random.normal(0, 1)
+
+
+def plot_test(fig=None):
+    range_parameters = [
+        RangeParameterConfig(name="x1", parameter_type="float", bounds=(-2, 10))
+    ]
+
+    metric_name = "response"
+    dim_names = ["x1"]
+
+
+    def test_function(x1):
+        # Original: y = -((x1 - 2) ** 2) + 10  -> range on [-2,10] is [-54, 10]
+        y = -((x1 - 2) ** 2) + 10
+        return (y + 54) / 64  # scale to [0,1]
+
+
+    noise_fn = lambda x, y: y + np.random.normal(0, 1)
+
+
+    tester = SequentialRuns(test_function, range_parameters, dim_names, metric_name)
+
+    runs = tester.run(
+        SingleTaskGP,
+        n_runs=4,
+        technical_repeats=2,
+        batch_size=3,
+        noise_fn=noise_fn,
+        plot_each=False,
+        )
+    runs.plot_GP(SingleTaskGP, fig=fig)
+    None
 
 

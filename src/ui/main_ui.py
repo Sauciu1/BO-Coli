@@ -175,7 +175,7 @@ class main_manager:
         except Exception as e:
             text = f"Could not load app information: {e}"
 
-        with st.expander("ℹ️ About this App", expanded=False):
+        with st.expander("ℹ️ User Instructions", expanded=False):
             st.markdown(text)
 
 

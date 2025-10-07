@@ -1,14 +1,15 @@
 # custom_gp_and_acq_f.py
 """This file contains custom Gaussian Process models and Acquisition Functions
-that can be used with the BO-COLI framework.
-To load a class it needs to have two class attributes:
-- bocoli_name: str - the name used to identify the class in the UI
-- bocoli_type: str - either "gp" for Gaussian Process models or "acqf" for acquisition functions
-When modified, these will be automatically discovered and loaded by the UI.
+For BOColi loader to discover your custom function it needs to have two attributes:
+* `bocoli_name` - the name by which your class will be displayed in the user UI.
+* `bocoli_type` - describes the type of class
+    * `gp` indicates a gaussian process.
+    * `acqf` indicates an acquisition function.
+* `bocoli_description` is not mandatory, but makes tracking and choosing functions in the UI a bit simpler. 
 If you are running from docker containers, you will need to rebuild the container
 to see changes reflected in the UI.
 """
-# Best of luck experimenting 
+# Best of luck experimenting, best, Povilas
 
 
 import torch
@@ -31,7 +32,7 @@ class bocoli_SingleTaskGP(SingleTaskGP):
     bocoli_name = "SingleTaskGP"
     bocoli_type = "gp"
     bocoli_description = """Standard Single Task Gaussian Process from BoTorch.
-    Cannot handle any noise"""
+    Cannot handle noise, fits through every observed point"""
 
     def __init__(self, train_X, train_Y, **kwargs):
         super().__init__(train_X, train_Y, **kwargs)
