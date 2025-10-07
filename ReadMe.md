@@ -26,7 +26,7 @@ This will take ~10 minutes to compile, afterwards it can be rapidly deployed and
 docker run -p 8989:8989 bo_coli:v9
 ```
 
-The link to the applet for your browser is then gonna be.
+The link to the applet for your browser is then gonna be:
 ``` bash
 http://localhost:8989/
 ```
@@ -53,7 +53,7 @@ class bocoli_SingleTaskGP(SingleTaskGP):
         super().__init__(train_X, train_Y, **kwargs)
 ```
 
-For BOColi loader to discover your custom function it needs to have two attributes:
+For the BOColi loader to discover your custom function it needs to have two attributes:
 * `bocoli_name` - the name by which your class will be displayed in the user UI.
 * `bocoli_type` - describes the type of class
     * `gp` indicates a gaussian process.
@@ -67,7 +67,7 @@ Afterwards, the app needs to be rerun (or docker image rebuilt). Please see the 
 Most important data is found at[.\notebooks\batch_bayesian_test.ipynb](.\notebooks\batch_bayesian_test.ipynb)
 
 
-To run the project, locally you will need python 3.13 installed on the system, from within project folder:
+To run the project locally you will need python 3.13 installed on the system, from within project folder:
 
 
 ``` bash
