@@ -1,9 +1,4 @@
-import json
-
-from pandas.io.formats import style
-
 from src.GPVisualiser import GPVisualiserPlotly
-from src.model_generation import HeteroWhiteSGP
 from src.BayesClientManager import BayesClientManager
 import pandas as pd
 import streamlit as st
@@ -273,6 +268,8 @@ class BayesPlotter:
         st.write(f"### Gaussian Process Visualization at parameter point ({param_str})")
         st.write("**GP visualization is shown as slice parallel to a parameter vs response plane**. " \
         "Elements farther from the plane slice are smaller in size.")
+      
+        fig.update_layout(height=650)
         st.plotly_chart(
             fig,
             use_container_width=True,
@@ -280,6 +277,7 @@ class BayesPlotter:
                 "displayModeBar": True,
                 "displaylogo": False,
                 "modeBarButtonsToRemove": ["pan2d", "lasso2d"],
+  
             },
         )
 
@@ -308,9 +306,13 @@ class BayesPlotter:
             legend_title="Group",
             margin=dict(l=10, r=10, t=60, b=40),
         )
+        fig.update_layout(height=500)
+
+
         st.plotly_chart(
             fig,
             use_container_width=True,
+  
             config={
                 "displayModeBar": True,
                 "displaylogo": False,
@@ -322,7 +324,7 @@ class BayesPlotter:
     @st.fragment
     def main_loop(self):
         if st.button("Reload Data for Plotting", key="reload_data_plot", type="primary"):
-            self.bayes_manager.sync_self()
+            self.check_plot_ready()
             st.rerun(scope="fragment")
         with st.expander("📈 Plot Group Performance", expanded=True):
             self.plot_group_performance()

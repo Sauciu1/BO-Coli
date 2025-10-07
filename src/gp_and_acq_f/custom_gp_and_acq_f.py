@@ -65,7 +65,7 @@ class MaternKernelSGP(SingleTaskGP):
     """A SingleTaskGP with a Matern Kernel"""
     bocoli_name = "MaternKernelSGP"
     bocoli_type = "gp"
-    bocoli_description = """Single Task Gaussian Process with a Matern Kernel.
+    bocoli_description = """Single Task Gaussian Process with Matern Kernel.
     No explicit technical repeat handling."""
 
     def __init__(self, train_X, train_Y, **kwargs):
@@ -119,15 +119,16 @@ class HeteroWhiteSGP(HeteroNoiseSGP):
     bocoli_name = "HeteroWhiteSGP"
     bocoli_type = "gp"
     bocoli_description = """Heteroscedastic Gaussian Process with a minimum white noise level.
-    Designed to handle noise from technical repeats."""
+    Designed to handle noise from technical repeats. Defaults to Matern Kernel if no technical
+    repeats are present."""
 
     def __init__(self, train_X, train_Y, quintile=0.05, **kwargs) -> None:
 
         std_unique, std_for_X, n_counts, inverse = self._calc_std(train_X, train_Y)
 
         if all(n_counts == 1):
-            print("Warning: All points have only one repeat. Consider using WhiteNoiseSGP instead.")
-            return SingleTaskGP.__init__(self, train_X, train_Y, **kwargs)
+            print("Warning: All points have only one repeat. Consider using a different Kernel.")
+            return MaternKernelSGP.__init__(self, train_X, train_Y, **kwargs)
 
         if torch.isnan((lower_noise := torch.quantile(std_unique, quintile))):
             lower_noise = std_unique.abs()[std_unique.abs() > 0].min()

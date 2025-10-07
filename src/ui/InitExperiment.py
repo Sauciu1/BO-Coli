@@ -96,6 +96,13 @@ class InitExperiment:
         """Wrapper to choose both GP model and acquisition function"""
         st.write("### Model and Acquisition Function Selection")
         columns = st.columns(2)
+        st.warning("""Please ensure that the selected Gaussian Process model
+                   and acquisition function are compatible with your experiment setup.
+                   We recommend using HeteroWhiteSGP for noisy experiments
+                   and SingleTaskGP for noise-free experiments,
+                   along with qLogExpectedImprovement acquisition function.
+                   """)
+
         with columns[0]:
             self._choose_gaussian_process()
         with columns[1]:
